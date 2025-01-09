@@ -1,0 +1,70 @@
+module quotient/runner
+
+go 1.23.0
+
+require (
+	github.com/redis/go-redis/v9 v9.7.0
+	quotient v0.0.0-00010101000000-000000000000
+)
+
+require (
+	al.essio.dev/pkg/shellescape v1.5.0 // indirect
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
+	github.com/ChrisTrenkamp/goxpath v0.0.0-20210404020558-97928f7e12b6 // indirect
+	github.com/bodgit/ntlmssp v0.0.0-20240506230425-31973bb52d9b // indirect
+	github.com/bodgit/windows v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/corpix/uarand v0.2.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/emersion/go-imap v1.2.1 // indirect
+	github.com/emersion/go-message v0.15.0 // indirect
+	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
+	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
+	github.com/geoffgarside/ber v1.1.0 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
+	github.com/go-ldap/ldap/v3 v3.4.8 // indirect
+	github.com/go-logr/logr v1.4.1 // indirect
+	github.com/go-ping/ping v1.1.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/hashicorp/go-uuid v1.0.3 // indirect
+	github.com/hirochachacha/go-smb2 v1.1.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.5.5 // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
+	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
+	github.com/jcmturner/gofork v1.7.6 // indirect
+	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
+	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
+	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/jlaffaye/ftp v0.2.0 // indirect
+	github.com/knadh/go-pop3 v1.0.0 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/masterzen/simplexml v0.0.0-20190410153822-31eea3082786 // indirect
+	github.com/masterzen/winrm v0.0.0-20240702205601-3fad6e106085 // indirect
+	github.com/miekg/dns v1.1.62 // indirect
+	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/tidwall/transform v0.0.0-20201103190739-32f242e2dbde // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/tools v0.22.0 // indirect
+	gorm.io/driver/postgres v1.5.9 // indirect
+	gorm.io/gorm v1.25.11 // indirect
+)
+
+replace quotient => ../
