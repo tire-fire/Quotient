@@ -206,6 +206,8 @@ ip = "10.100.1_.2"
 
 Custom checks can be added to the `./custom-checks/` directory. It is very common to make the custom check simply run some other script that you have written that has the necessary logic to check the service. The script should return a 0 if the service is up and anything else if it is down. The script should be executable. The script will be mounted in the `/app/checks/` directory of the runner. If the script invokes external dependencies or needs to have a specific run time, this should be added to the Dockerfile.runner and the runner rebuilt and redeployed.
 
+For a detailed walkthrough of writing custom checks, see [docs/custom-checks.md](docs/custom-checks.md).
+
 ## Contributing
 
 Please fork the repository and submit a pull request. For major changes, please open an issue first to discuss what you would like to change.
