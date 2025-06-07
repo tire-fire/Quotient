@@ -39,6 +39,7 @@ If you encounter any issues during setup or operation, consider the following:
   POSTGRES_DB=engine
   REDIS_PASSWORD=redis_password
   ```
+- Ensure `divisor/.env` is populated with `NUM_IPS`, `DESIRED_SUBNET`, and `TARGET_SUBNETS` for the Divisor service.
 - Make sure that config values are set in `event.conf` before running the engine.
 
 ## Web setup
