@@ -1,0 +1,75 @@
+{{ define "page" }}
+<div class="d-flex w-100 h-100">
+    <div class="pt-4 w-100 h-100 overflow-y-scroll">
+        <div class="container">
+            <div class="row mb-3">
+                <h3>Configured Service Checks</h3>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Box</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Last Results</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checksBody">
+                    </tbody>
+                </table>
+            </div>
+            <script>
+                let TEAMMAP = {};
+                fetch('/api/teams')
+                    .then(r => r.json())
+                    .then(data => {
+                        data.forEach(t => TEAMMAP[t.ID] = t.Name);
+                        fetchChecks();
+                    });
+                function fetchChecks() {
+                    fetch('/api/engine/checks')
+                        .then(r => r.json())
+                        .then(data => {
+                            const body = document.getElementById('checksBody');
+                            body.textContent = '';
+                            data.forEach(check => {
+                                const row = document.createElement('tr');
+                                const name = document.createElement('td');
+                                name.textContent = check.name;
+                                const box = document.createElement('td');
+                                box.textContent = check.box;
+                                const type = document.createElement('td');
+                                type.textContent = check.type;
+                                const status = document.createElement('td');
+                                status.textContent = check.enabled ? 'Enabled' : 'Disabled';
+                                const results = document.createElement('td');
+                                for (const id in TEAMMAP) {
+                                    const img = document.createElement('img');
+                                    const res = check.last_results[id];
+                                    if (res === true) {
+                                        img.src = '/static/assets/services/up.png';
+                                    } else if (res === false) {
+                                        img.src = '/static/assets/services/down.png';
+                                    } else {
+                                        img.src = '/static/assets/services/pending.png';
+                                    }
+                                    img.width = 20;
+                                    img.height = 20;
+                                    img.setAttribute('title', TEAMMAP[id]);
+                                    img.classList.add('me-1');
+                                    results.appendChild(img);
+                                }
+                                row.appendChild(name);
+                                row.appendChild(box);
+                                row.appendChild(type);
+                                row.appendChild(status);
+                                row.appendChild(results);
+                                body.appendChild(row);
+                            });
+                        });
+                }
+            </script>
+        </div>
+    </div>
+</div>
+{{ end }}
