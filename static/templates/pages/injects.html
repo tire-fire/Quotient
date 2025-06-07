@@ -425,17 +425,22 @@
     const PLACEHOLDER_TAB = document.getElementById("tab--placeholder")
     const PLACEHOLDER_PANE = document.getElementById("pane--placeholder")
 
-    fetch("/api/injects")
-        .then((response) => {
-            if (!response.ok) {
-                Promise.reject(response)
-            }
-            return response.json()
-        })
-        .then((data) => {
-            let tabs = [];
-            let panes = [];
-            for (const inject of data) {
+    function loadInjects() {
+        // remove any previously loaded tabs/panes before reloading
+        TAB_CONTAINER.querySelectorAll(".nav-link:not(#tab--placeholder)").forEach((el) => el.remove())
+        PANE_CONTAINER.querySelectorAll(".tab-pane:not(#pane--placeholder)").forEach((el) => el.remove())
+
+        fetch("/api/injects")
+            .then((response) => {
+                if (!response.ok) {
+                    Promise.reject(response)
+                }
+                return response.json()
+            })
+            .then((data) => {
+                let tabs = [];
+                let panes = [];
+                for (const inject of data) {
                 inject.OpenTime = (new Date(inject.OpenTime))
                 inject.DueTime = (new Date(inject.DueTime))
                 inject.CloseTime = (new Date(inject.CloseTime))
@@ -559,5 +564,11 @@
         .catch((error) => {
             console.error(error)
         });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadInjects();
+        setInterval(loadInjects, 30000);
+    });
 </script>
 {{ end }}
