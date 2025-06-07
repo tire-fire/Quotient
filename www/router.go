@@ -146,6 +146,7 @@ func (router *Router) Start() {
 	mux.HandleFunc("GET /api/engine/reset", ADMINAUTH(api.ResetScores))
 	mux.HandleFunc("GET /api/engine", ADMINAUTH(api.GetEngine))
 	mux.HandleFunc("GET /api/engine/tasks", ADMINAUTH(api.GetActiveTasks))
+	mux.HandleFunc("GET /api/engine/checks", ADMINAUTH(api.GetChecks))
 	mux.HandleFunc("POST /api/admin/teams", ADMINAUTH(api.UpdateTeams))
 
 	mux.HandleFunc("GET /api/engine/export/scores", ADMINAUTH(api.ExportScores))
@@ -155,6 +156,7 @@ func (router *Router) Start() {
 	mux.HandleFunc("GET /admin", ADMINAUTH(router.AdminPage))
 	mux.HandleFunc("GET /admin/engine", ADMINAUTH(router.AdministrateEnginePage))
 	mux.HandleFunc("GET /admin/runners", ADMINAUTH(router.AdministrateRunnersPage))
+	mux.HandleFunc("GET /admin/checks", ADMINAUTH(router.AdministrateChecksPage))
 	mux.HandleFunc("GET /admin/teams", ADMINAUTH(router.AdministrateTeamsPage))
 	mux.HandleFunc("GET /admin/appearance", ADMINAUTH(router.AdministrateAppearancePage))
 
