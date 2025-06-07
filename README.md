@@ -14,13 +14,17 @@ cd Quotient
 docker-compose up --build --detach
 ```
 
+The server binary accepts a `--log-level` flag (`debug`, `info`, `warn`,
+or `error`) if you wish to change the verbosity of its output. The default
+level is `debug`.
+
 ## Architecture
 
 The system is designed as a group of docker components using docker compose in docker-compose.yml. These components are:
 1. Server - this is the scoring engine, the web frontend and API, configuration parser, and coordinator of scoring checks.
 2. Database - PostgreSQL database that keeps state for each of the checks and round information.
 3. Redis - This passes data between the runners and the scoring engine as a queue.
-4. Runner - This alpine container has go code that runs the service check after retrieving the task from redis. It needs to be customize if custom checks require additionally installed software like python modules (automatically installed from requirements.txt) or alpine packages. This is managed by Dockerfile.runner and can be rebuilt with `docker-compose build runner`.
+4. Runner - This alpine container has go code that runs the service check after retrieving the task from redis. It needs to be customize if custom checks require additionally installed software like python modules (automatically installed from requirements.txt) or alpine packages. This is managed by Dockerfile.runner and can be rebuilt with `docker-compose build runner`. The runner honors the `REDIS_ADDR` and `RUNNER_ID` environment variables if you need to point at a different Redis server or identify individual workers.
 5. Divisor - Docker container with elevated privileges that randomly selects an IP address from a configured subnet, and assigns from a configurable pool size to the docker runner containers. This needs to be able to query docker to determine the docker hosts and to be able to manage host network iptables. This is a separate git repo and a submodule of this repo under ./divisor.
 
 ## Troubleshooting
@@ -28,6 +32,15 @@ The system is designed as a group of docker components using docker compose in d
 If you encounter any issues during setup or operation, consider the following:
 - Check the logs for any error messages using `docker-compose logs`.
 - Verify that all environment variables are correctly set in the `.env` file.
+  A typical `.env` contains:
+
+  ```
+  POSTGRES_PASSWORD=postgres_password
+  POSTGRES_USER=engineuser
+  POSTGRES_HOST=quotient_database
+  POSTGRES_DB=engine
+  REDIS_PASSWORD=redis_password
+  ```
 - Make sure that config values are set in `event.conf` before running the engine.
 
 ## Web setup
@@ -37,6 +50,9 @@ Through the Admin UI you will have to specify the "Identifier" for each team. Th
 If you want to rotate IPs, configure [Divisor](https://github.com/dbaseqp/Divisor).
 
 ## Configuration
+
+The engine watches `event.conf` for changes and automatically reloads the
+configuration without needing a restart.
 
 1. How to Create Configuration File
 2. Configuration Sections
@@ -98,6 +114,7 @@ ip = "10.100.1_.2"
 ```toml
 [RequiredSettings]
 EventName = "Name of my Competition"
+# EventType can be `rvb` (Red vs Blue) or `koth` (King of the Hill)
 EventType = "rvb"
 DBConnectURL = "postgres://engineuser:password@quotient_database:5432/engine"
 BindAddress = "0.0.0.0"
