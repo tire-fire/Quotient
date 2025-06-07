@@ -14,9 +14,7 @@ cd Quotient
 docker-compose up --build --detach
 ```
 
-The server binary accepts a `--log-level` flag (`debug`, `info`, `warn`,
-or `error`) if you wish to change the verbosity of its output. The default
-level is `debug`.
+The server binary accepts a `--log-level` flag (`debug`, `info`, `warn`, or `error`) if you wish to change the verbosity of its output. The default level is `debug`.
 
 ## Architecture
 
@@ -51,8 +49,7 @@ If you want to rotate IPs, configure [Divisor](https://github.com/dbaseqp/Diviso
 
 ## Configuration
 
-The engine watches `event.conf` for changes and automatically reloads the
-configuration without needing a restart.
+The engine watches `event.conf` for changes and automatically reloads the configuration without needing a restart.
 
 1. How to Create Configuration File
 2. Configuration Sections
@@ -114,7 +111,6 @@ ip = "10.100.1_.2"
 ```toml
 [RequiredSettings]
 EventName = "Name of my Competition"
-# EventType can be `rvb` (Red vs Blue) or `koth` (King of the Hill)
 EventType = "rvb"
 DBConnectURL = "postgres://engineuser:password@quotient_database:5432/engine"
 BindAddress = "0.0.0.0"
