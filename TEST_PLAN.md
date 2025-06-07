@@ -36,7 +36,10 @@ This document outlines the proposed tests for the Quotient scoring system.  All 
   - `createRunner` instantiates the correct check type from task data.
 - **Task execution**
   - `handleTask` respects deadlines and writes results back to Redis.
-  - Runner exits on `reset` event broadcast (#41).
+  - Runner exits on `reset` event broadcast (#41) and restart is triggered.
+  - Reset interrupts any running checks and clears queued work.
+  - Timeout handling returns captured stdout/stderr for normal and custom checks.
+  - Validate that custom checks and built-in checks both propagate command output when a timeout occurs.
 
 ## 5. Service Checks
 Each check under `engine/checks/` should have unit tests covering:
@@ -69,6 +72,10 @@ Each check under `engine/checks/` should have unit tests covering:
 
 ## 9. Security and Error Handling
 - Ensure helper functions like `GetFile` do not permit directory traversal (see TODO in `helpers.go`).
+- Verify input and output validation on all endpoints, rejecting unexpected or malformed data.
+- Confirm authentication and authorization checks are enforced on every API path.
+- Add tests that attempt XSS, CSRF, IDOR, command injection, SQL injection, and deserialization attacks to ensure they are blocked.
+- Ensure CORS policy does not allow credentialed requests from arbitrary origins.
 - Verify that invalid input to API endpoints results in appropriate HTTP status codes without leaking sensitive information.
 
 ## Running Tests
