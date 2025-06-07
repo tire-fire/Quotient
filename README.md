@@ -149,7 +149,7 @@ SlaPenalty = 50
 #### UI Settings
 
 ```toml
-[UiSettings]
+[UISettings]
 DisableInfoPage = true
 DisableGraphsForBlueTeam = true
 ShowAnnouncementsForRedTeam = true
