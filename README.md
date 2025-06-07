@@ -103,7 +103,7 @@ DBConnectURL = "postgres://engineuser:password@quotient_database:5432/engine"
 BindAddress = "0.0.0.0"
 ```
 
-The "DBConnectURL" will use values you popualte in the `.env` file. The `BindAddress` is the IP address the scoring engine will bind to. If you are deploying in the Docker container, this can be set to `0.0.0.0`.
+The "DBConnectURL" will use values you populate in the `.env` file. The `BindAddress` is the IP address the scoring engine will bind to. If you are deploying in the Docker container, this can be set to `0.0.0.0`.
 
 #### Ldap Settings
 
