@@ -109,8 +109,23 @@
     const formSubmit = (event) => {
         event.preventDefault()
         const newcreds = document.getElementById("pcr__credentials").value.split("\n")
-        const usernames = newcreds.map(cred => cred.split(/,(.+)/)[0])
-        const passwords = newcreds.map(cred => cred.split(/,(.+)/)[1])
+            .filter(l => l.trim() !== "")
+        const unquote = (str) => {
+            if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+                return str.slice(1, -1)
+            }
+            return str
+        }
+
+        const usernames = []
+        const passwords = []
+        for (const cred of newcreds) {
+            const parts = cred.split(/,(.+)/)
+            const username = unquote(parts[0] ?? "")
+            const password = unquote(parts[1] ?? "")
+            usernames.push(username)
+            passwords.push(password)
+        }
         const team_id = document.getElementById("team-select").value
         const credlist_id = document.getElementById("credlist-select").value
         const data = {
