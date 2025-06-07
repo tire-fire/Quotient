@@ -3,11 +3,15 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"quotient/engine/db"
 	"slices"
 	"strconv"
+	"time"
 )
 
 func GetCredlists(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +39,55 @@ func GetCredlists(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetPcrs(w http.ResponseWriter, r *http.Request) {
+	// Placeholder for future team PCR functionality
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
+func AdminGetPcrs(w http.ResponseWriter, r *http.Request) {
+	req_roles := r.Context().Value("roles").([]string)
+	if !slices.Contains(req_roles, "admin") {
+		w.WriteHeader(http.StatusForbidden)
+		data := map[string]any{"error": "Forbidden"}
+		d, _ := json.Marshal(data)
+		w.Write(d)
+		return
+	}
+
+	teams, err := db.GetTeams()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		d, _ := json.Marshal(map[string]any{"error": "Error getting teams"})
+		w.Write(d)
+		return
+	}
+
+	type pcrInfo struct {
+		TeamID   uint   `json:"team_id"`
+		TeamName string `json:"team_name"`
+		Credlist string `json:"credlist"`
+		Updated  string `json:"updated"`
+	}
+
+	var data []pcrInfo
+
+	for _, team := range teams {
+		for _, cred := range conf.CredlistSettings.Credlist {
+			filePath := filepath.Join("submissions/pcrs", fmt.Sprint(team.ID), cred.CredlistPath)
+			fi, err := os.Stat(filePath)
+			if err != nil {
+				continue
+			}
+			data = append(data, pcrInfo{
+				TeamID:   team.ID,
+				TeamName: team.Name,
+				Credlist: cred.CredlistPath,
+				Updated:  fi.ModTime().Format(time.RFC3339),
+			})
+		}
+	}
+
+	d, _ := json.Marshal(data)
+	w.Write(d)
 }
 
 func CreatePcr(w http.ResponseWriter, r *http.Request) {
@@ -104,4 +156,43 @@ func CreatePcr(w http.ResponseWriter, r *http.Request) {
 	}
 	d, _ := json.Marshal(data)
 	w.Write(d)
+}
+
+func DownloadPcrFile(w http.ResponseWriter, r *http.Request) {
+	req_roles := r.Context().Value("roles").([]string)
+	if !slices.Contains(req_roles, "admin") {
+		w.WriteHeader(http.StatusForbidden)
+		data := map[string]any{"error": "Forbidden"}
+		d, _ := json.Marshal(data)
+		w.Write(d)
+		return
+	}
+
+	teamStr := r.PathValue("team")
+	fileName := r.PathValue("file")
+	teamID, err := strconv.Atoi(teamStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	filePath := filepath.Join("submissions/pcrs", fmt.Sprint(teamID), fileName)
+	if !PathIsInDir("submissions/pcrs", filePath) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if _, err := io.Copy(w, file); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }

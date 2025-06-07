@@ -151,12 +151,16 @@ func (router *Router) Start() {
 	mux.HandleFunc("GET /api/engine/export/scores", ADMINAUTH(api.ExportScores))
 	mux.HandleFunc("GET /api/engine/export/config", ADMINAUTH(api.ExportConfig))
 
+	mux.HandleFunc("GET /api/admin/pcrs", ADMINAUTH(api.AdminGetPcrs))
+	mux.HandleFunc("GET /pcrs/{team}/{file}", ADMINAUTH(api.DownloadPcrFile))
+
 	// admin auth WWW routes
 	mux.HandleFunc("GET /admin", ADMINAUTH(router.AdminPage))
 	mux.HandleFunc("GET /admin/engine", ADMINAUTH(router.AdministrateEnginePage))
 	mux.HandleFunc("GET /admin/runners", ADMINAUTH(router.AdministrateRunnersPage))
 	mux.HandleFunc("GET /admin/teams", ADMINAUTH(router.AdministrateTeamsPage))
 	mux.HandleFunc("GET /admin/appearance", ADMINAUTH(router.AdministrateAppearancePage))
+	mux.HandleFunc("GET /admin/pcrs", ADMINAUTH(router.AdministratePcrsPage))
 
 	// start server
 	server := http.Server{

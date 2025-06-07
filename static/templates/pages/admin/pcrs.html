@@ -1,0 +1,49 @@
+{{ define "page" }}
+<div class="d-flex w-100 h-100">
+    <div class="pt-4 w-100 h-100 overflow-y-scroll">
+        <div class="container">
+            <div class="row mb-3">
+                <h3>Password Change Requests</h3>
+                <input type="text" class="form-control" id="pcrSearch" placeholder="Search" />
+            </div>
+            <div class="row">
+                <table class="table table-striped" id="pcrTable">
+                    <thead>
+                        <tr>
+                            <th>Team</th>
+                            <th>Credlist</th>
+                            <th>Updated</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+fetch('/api/admin/pcrs').then(r => r.json()).then(data => {
+    const tbody = document.querySelector('#pcrTable tbody');
+    data.forEach(entry => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${entry.team_name}</td><td>${entry.credlist}</td><td>${entry.updated}</td>`;
+        const dl = document.createElement('a');
+        dl.className = 'btn btn-sm btn-primary';
+        dl.textContent = 'Download';
+        dl.href = `/pcrs/${entry.team_id}/${entry.credlist}`;
+        const td = document.createElement('td');
+        td.appendChild(dl);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+    });
+});
+
+document.getElementById('pcrSearch').addEventListener('input', function() {
+    const term = this.value.toLowerCase();
+    document.querySelectorAll('#pcrTable tbody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+});
+</script>
+{{ end }}
