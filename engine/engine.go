@@ -314,6 +314,8 @@ func (se *ScoringEngine) LoadCredentials() error {
 
 func (se *ScoringEngine) UpdateCredentials(teamID uint, credlistName string, usernames []string, passwords []string) error {
 	se.CredentialsMutex[teamID].Lock()
+	// Ensure the mutex is released even if the function returns early
+	defer se.CredentialsMutex[teamID].Unlock()
 
 	slog.Debug("updating credentials", "teamID", teamID, "credlistName", credlistName)
 
@@ -372,8 +374,6 @@ func (se *ScoringEngine) UpdateCredentials(teamID uint, credlistName string, use
 	if err := writer.Error(); err != nil {
 		return fmt.Errorf("failed to flush pcr writer: %v", err)
 	}
-
-	se.CredentialsMutex[teamID].Unlock()
 
 	return nil
 }
