@@ -10,10 +10,22 @@
                     <div class="card overflow-y-scroll">
                         <div class="card-img-top graph" id="service-status"></div>
                         <script>
+                            let TEAMMAP = {}
+                            let ROUNDID = 0
                             let options = {
                                 series: [],
                                 chart: {
                                     type: 'heatmap',
+                                    events: {
+                                        dataPointSelection: function(event, chartContext, config) {
+                                            const teamName = chartContext.w.globals.seriesNames[config.seriesIndex]
+                                            const serviceName = chartContext.w.globals.categoryLabels[config.dataPointIndex]
+                                            const teamID = TEAMMAP[teamName]
+                                            if (teamID !== undefined) {
+                                                window.location.href = `/services?team=${teamID}&service=${serviceName}&round=${ROUNDID}`
+                                            }
+                                        }
+                                    }
                                 },
                                 stroke: {
                                     width: 1
@@ -84,7 +96,9 @@
                                     })
                                     .then((data) => {
                                         console.log(data)
+                                        ROUNDID = data.roundID
                                         series = data.series.map((service) => {
+                                            TEAMMAP[service.Name] = service.ID
                                             return {
                                                 name: service.Name,
                                                 data: service.Data.map((status) => {
