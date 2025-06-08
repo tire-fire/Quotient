@@ -29,7 +29,11 @@
             {{ if or (contains .roles "team") (contains .roles "admin") }}
             {{ template "navbutton" (dict "pipe" . "title" "Services" "href" "/services" "icon" "bi-speedometer2") }}
             {{ template "navbutton" (dict "pipe" . "title" "Injects" "href" "/injects" "icon" "bi-envelope") }}
+            {{ if contains .roles "admin" }}
+            {{ template "navbutton" (dict "pipe" . "title" "PCRs" "href" "/admin/pcrs" "icon" "bi-key") }}
+            {{ else }}
             {{ template "navbutton" (dict "pipe" . "title" "PCRs" "href" "/pcr" "icon" "bi-key") }}
+            {{ end }}
             {{ end }}
 
             {{ if contains .roles "admin" }}
