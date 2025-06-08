@@ -109,6 +109,7 @@ func GetEngine(w http.ResponseWriter, r *http.Request) {
 		"last_round":         lastRound,
 		"current_round_time": eng.CurrentRoundStartTime,
 		"next_round_time":    eng.NextRoundStartTime,
+		"start_time":         eng.Config.MiscSettings.StartTime,
 		"running":            !eng.IsEnginePaused,
 	})
 	w.Write(d)

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -82,6 +83,7 @@ type MiscConfig struct {
 	LogFile             string
 
 	StartPaused bool
+	StartTime   time.Time
 
 	// Round settings
 	Delay  int
