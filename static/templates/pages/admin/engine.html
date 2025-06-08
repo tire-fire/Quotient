@@ -14,6 +14,7 @@
                     <div class="col">
                         <h3>Round Progress</h3>
                         <p id="round__number"></p>
+                        <p id="engine__status" class="fw-bold"></p>
                         <div class="progress">
                             <div id="roundProgress"
                                 class="progress-bar progress-bar-striped progress-bar-animated bg-success"
@@ -49,9 +50,11 @@
                 </div>
                 <script>
                     const PROGRESS = document.getElementById('roundProgress');
+                    const ENGINE_STATUS = document.getElementById('engine__status');
                     let LASTROUND = 0;
                     let CURRENTROUND = 0;
                     let NEXTROUND = 0;
+                    let STARTTIME = 0;
                     let RUNNING = false;
 
                     document.getElementById('pauseButton').addEventListener('click', () => {
@@ -90,11 +93,17 @@
                                 LASTROUND = data["last_round"];
                                 CURRENTROUND = data["current_round_time"];
                                 NEXTROUND = data["next_round_time"];
+                                STARTTIME = data["start_time"];
                                 RUNNING = data["running"];
 
                                 let last_round_start_time = new Date(LASTROUND.StartTime).toLocaleString();
                                 let current_round_time = new Date(CURRENTROUND).toLocaleString();
                                 let next_round_time = new Date(NEXTROUND).toLocaleString();
+                                if (STARTTIME && Date.now() < new Date(STARTTIME)) {
+                                    ENGINE_STATUS.textContent = `Engine will start at ${new Date(STARTTIME).toLocaleString()}`;
+                                } else {
+                                    ENGINE_STATUS.textContent = '';
+                                }
 
                                 document.getElementById('round__number').textContent = `Round ${LASTROUND.ID} was at ${last_round_start_time}.
                                 Round ${LASTROUND.ID + 1} started at ${current_round_time} and should end at ${next_round_time}.`;
@@ -136,11 +145,21 @@
                         PROGRESS.setAttribute('aria-valuenow', progress);
                     }
 
+                    function updateStatus() {
+                        if (STARTTIME && Date.now() < new Date(STARTTIME)) {
+                            const diff = Math.ceil((new Date(STARTTIME) - Date.now()) / 1000);
+                            ENGINE_STATUS.textContent = `Engine will start in ${diff}s`;
+                        } else {
+                            ENGINE_STATUS.textContent = '';
+                        }
+                    }
+
                     getEngineData()
                     updateProgress()
+                    updateStatus()
 
                     // update every second
-                    setInterval(updateProgress, 1000);
+                    setInterval(() => { updateProgress(); updateStatus(); }, 1000);
                 </script>
             </div>
         </div>

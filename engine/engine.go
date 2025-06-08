@@ -99,6 +99,15 @@ func (se *ScoringEngine) Start() {
 
 	se.NextRoundStartTime = time.Time{}
 
+	if se.CurrentRound == 1 && !se.Config.MiscSettings.StartTime.IsZero() {
+		wait := time.Until(se.Config.MiscSettings.StartTime)
+		if wait > 0 {
+			slog.Info("Waiting for engine start time", "start_time", se.Config.MiscSettings.StartTime)
+			se.NextRoundStartTime = se.Config.MiscSettings.StartTime
+			time.Sleep(wait)
+		}
+	}
+
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "quotient_redis:6379"
