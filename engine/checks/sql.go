@@ -61,6 +61,7 @@ func (c Sql) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			checkResult.Debug = "no query command, only checking connection. creds used were " + username + ":" + password
 			checkResult.Status = true
 			response <- checkResult
+			return
 		}
 
 		rows, err = db.QueryContext(context.TODO(), q.Command)
@@ -90,13 +91,14 @@ func (c Sql) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 						checkResult.Status = true
 						checkResult.Debug = "found regex match: " + output + ". creds used were " + username + ":" + password
 						response <- checkResult
+						return
 					}
 				} else {
 					if strings.TrimSpace(output) == q.Output {
 						checkResult.Status = true
 						checkResult.Debug = "found exact string match: " + output + ".creds used were " + username + ":" + password
 						response <- checkResult
-						break
+						return
 					}
 				}
 			}
