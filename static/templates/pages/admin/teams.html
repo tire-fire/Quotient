@@ -33,6 +33,7 @@
                         const TBODY = document.querySelector('#team-table tbody');
                         data.forEach(team => {
                             const ROW = document.createElement('tr');
+                            ROW.setAttribute('data-team', team.ID);
                             const NAME_CELL = document.createElement('td');
                             NAME_CELL.textContent = team.Name;
                             const ID_CELL = document.createElement('td');
@@ -89,8 +90,10 @@
                     const teamsData = [];
                     const rows = document.querySelectorAll('#team-table tbody tr');
                     rows.forEach(row => {
-                        const teamID = parseInt(row.querySelector('input').getAttribute('aria-describedby').split('-')[2]);
-                        const identifier = row.querySelector('input').value;
+                        const input = row.querySelector('input[aria-label="Team Identifier"]');
+                        if (!input) { return; }
+                        const teamID = parseInt(row.getAttribute('data-team'));
+                        const identifier = input.value;
                         const active = row.querySelector('button:nth-child(2)').disabled;
                         teamsData.push({ ID: teamID, Identifier: identifier, Active: active });
                     });

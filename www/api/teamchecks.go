@@ -17,8 +17,8 @@ func GetTeamChecks(w http.ResponseWriter, r *http.Request) {
 
 	// Collect unique services from configuration
 	serviceMap := make(map[string]bool)
-	for _, r := range eng.Config.AllChecks() {
-		serviceMap[r.GetName()] = true
+	for _, chk := range eng.Config.AllChecks() {
+		serviceMap[chk.GetName()] = true
 	}
 	services := make([]string, 0, len(serviceMap))
 	for s := range serviceMap {
