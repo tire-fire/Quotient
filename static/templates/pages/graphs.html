@@ -156,19 +156,14 @@
                                                 path: img,
                                                 offsetY: (5+(series.length-1)*17)-i*17,
                                             },
-                                        }
-
-                                        STATUSCHART.addPointAnnotation(point)
-
-                                        const el = document.getElementById(pointID)
-                                        if (el) {
-                                            el.style.cursor = 'pointer'
-                                            el.addEventListener('click', () => {
+                                            click: () => {
                                                 if (teamID !== undefined) {
                                                     window.location.href = `/services?team=${teamID}&service=${serviceName}&round=${ROUNDID}`
                                                 }
-                                            })
+                                            }
                                         }
+
+                                        STATUSCHART.addPointAnnotation(point)
                                     }
                                 }
                             }
