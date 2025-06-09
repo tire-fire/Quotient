@@ -312,6 +312,8 @@ func checkConfig(conf *ConfigSettings) error {
 		}
 		if _, ok := dupeBoxMap[conf.Box[i].Name]; ok {
 			errResult = errors.Join(errResult, errors.New("duplicate box name found: "+conf.Box[i].Name))
+		} else {
+			dupeBoxMap[conf.Box[i].Name] = true
 		}
 		slog.Debug("Checking box configuration",
 			"box", conf.Box[i].Name,
