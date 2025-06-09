@@ -9,8 +9,9 @@
   ShowDebugToBlueTeam = false
   LogoImage = "/static/assets/quotient.svg"
   StartPaused = true
-  # Set the engine start time in RFC3339 format
+  # Set the engine start and stop time in RFC3339 format
   # StartTime = "2025-01-02T15:04:05Z"
+  # StopTime = "2025-01-03T15:04:05Z"
   Delay = 30
   Jitter = 5
   Points = 1

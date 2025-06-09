@@ -84,6 +84,7 @@ type MiscConfig struct {
 
 	StartPaused bool
 	StartTime   time.Time
+	StopTime    time.Time
 
 	// Round settings
 	Delay  int

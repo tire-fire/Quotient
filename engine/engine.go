@@ -108,6 +108,18 @@ func (se *ScoringEngine) Start() {
 		}
 	}
 
+	if !se.Config.MiscSettings.StopTime.IsZero() {
+		go func(stop time.Time) {
+			wait := time.Until(stop)
+			if wait > 0 {
+				slog.Info("Engine stop time scheduled", "stop_time", stop)
+				time.Sleep(wait)
+			}
+			slog.Info("Pausing engine at stop time", "stop_time", stop)
+			se.PauseEngine()
+		}(se.Config.MiscSettings.StopTime)
+	}
+
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "quotient_redis:6379"
@@ -320,6 +332,16 @@ func (se *ScoringEngine) ResetScores() error {
 	slog.Info("Scores reset and Redis queues cleared successfully")
 
 	return nil
+}
+
+// SetStartTime updates the engine start time at runtime.
+func (se *ScoringEngine) SetStartTime(t time.Time) {
+	se.Config.MiscSettings.StartTime = t
+}
+
+// SetStopTime updates the engine stop time at runtime.
+func (se *ScoringEngine) SetStopTime(t time.Time) {
+	se.Config.MiscSettings.StopTime = t
 }
 
 // perform a round of koth

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
+
 	"quotient/engine/db"
 )
 
@@ -110,6 +112,7 @@ func GetEngine(w http.ResponseWriter, r *http.Request) {
 		"current_round_time": eng.CurrentRoundStartTime,
 		"next_round_time":    eng.NextRoundStartTime,
 		"start_time":         eng.Config.MiscSettings.StartTime,
+		"stop_time":          eng.Config.MiscSettings.StopTime,
 		"running":            !eng.IsEnginePaused,
 	})
 	w.Write(d)
@@ -136,6 +139,52 @@ func UpdateTeams(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	d := []byte(`{"status": "success"}`)
+	w.Write(d)
+}
+
+func UpdateStartTime(w http.ResponseWriter, r *http.Request) {
+	type Form struct {
+		StartTime string `json:"start_time"`
+	}
+
+	var form Form
+	if err := json.NewDecoder(r.Body).Decode(&form); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	t, err := time.Parse(time.RFC3339, form.StartTime)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	eng.SetStartTime(t)
+
+	d := []byte(`{"status": "success"}`)
+	w.Write(d)
+}
+
+func UpdateStopTime(w http.ResponseWriter, r *http.Request) {
+	type Form struct {
+		StopTime string `json:"stop_time"`
+	}
+
+	var form Form
+	if err := json.NewDecoder(r.Body).Decode(&form); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	t, err := time.Parse(time.RFC3339, form.StopTime)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	eng.SetStopTime(t)
 
 	d := []byte(`{"status": "success"}`)
 	w.Write(d)

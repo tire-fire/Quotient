@@ -11,10 +11,29 @@
                     </div>
                 </div>
                 <div class="row mb-3">
+                    <div class="col-6">
+                        <label for="startTimeInput" class="form-label">Start Time</label>
+                        <input type="datetime-local" id="startTimeInput" class="form-control" />
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <button id="setStartTimeButton" class="btn btn-primary rounded-0">Update Start Time</button>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label for="stopTimeInput" class="form-label">Stop Time</label>
+                        <input type="datetime-local" id="stopTimeInput" class="form-control" />
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <button id="setStopTimeButton" class="btn btn-primary rounded-0">Update Stop Time</button>
+                    </div>
+                </div>
+                <div class="row mb-3">
                     <div class="col">
                         <h3>Round Progress</h3>
                         <p id="round__number"></p>
                         <p id="engine__status" class="fw-bold"></p>
+                        <p id="engine__stop_status" class="fw-bold"></p>
                         <div class="progress">
                             <div id="roundProgress"
                                 class="progress-bar progress-bar-striped progress-bar-animated bg-success"
@@ -51,10 +70,18 @@
                 <script>
                     const PROGRESS = document.getElementById('roundProgress');
                     const ENGINE_STATUS = document.getElementById('engine__status');
+<<<<<<< ours
+=======
+                    const ENGINE_STOP_STATUS = document.getElementById('engine__stop_status');
+>>>>>>> theirs
                     let LASTROUND = 0;
                     let CURRENTROUND = 0;
                     let NEXTROUND = 0;
                     let STARTTIME = 0;
+<<<<<<< ours
+=======
+                    let STOPTIME = 0;
+>>>>>>> theirs
                     let RUNNING = false;
 
                     document.getElementById('pauseButton').addEventListener('click', () => {
@@ -86,6 +113,32 @@
                                 });
                         }
                     });
+                    document.getElementById('setStartTimeButton').addEventListener('click', () => {
+                        const val = document.getElementById('startTimeInput').value;
+                        if (!val) { return; }
+                        const iso = new Date(val).toISOString();
+                        fetch('/api/engine/starttime', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ start_time: iso }),
+                        })
+                            .then(response => response.json())
+                            .then(() => { window.location.reload(); })
+                            .catch(error => console.error('Error setting start time:', error));
+                    });
+                    document.getElementById('setStopTimeButton').addEventListener('click', () => {
+                        const val = document.getElementById('stopTimeInput').value;
+                        if (!val) { return; }
+                        const iso = new Date(val).toISOString();
+                        fetch('/api/engine/stoptime', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stop_time: iso }),
+                        })
+                            .then(response => response.json())
+                            .then(() => { window.location.reload(); })
+                            .catch(error => console.error('Error setting stop time:', error));
+                    });
                     function getEngineData() {
                         fetch('/api/engine')
                             .then(response => response.json())
@@ -94,7 +147,18 @@
                                 CURRENTROUND = data["current_round_time"];
                                 NEXTROUND = data["next_round_time"];
                                 STARTTIME = data["start_time"];
+<<<<<<< ours
+=======
+                                STOPTIME = data["stop_time"];
+>>>>>>> theirs
                                 RUNNING = data["running"];
+
+                                if (STARTTIME) {
+                                    document.getElementById('startTimeInput').value = new Date(STARTTIME).toISOString().slice(0,16);
+                                }
+                                if (STOPTIME) {
+                                    document.getElementById('stopTimeInput').value = new Date(STOPTIME).toISOString().slice(0,16);
+                                }
 
                                 let last_round_start_time = new Date(LASTROUND.StartTime).toLocaleString();
                                 let current_round_time = new Date(CURRENTROUND).toLocaleString();
@@ -104,6 +168,14 @@
                                 } else {
                                     ENGINE_STATUS.textContent = '';
                                 }
+<<<<<<< ours
+=======
+                                if (STOPTIME && Date.now() < new Date(STOPTIME)) {
+                                    ENGINE_STOP_STATUS.textContent = `Engine will stop at ${new Date(STOPTIME).toLocaleString()}`;
+                                } else {
+                                    ENGINE_STOP_STATUS.textContent = '';
+                                }
+>>>>>>> theirs
 
                                 document.getElementById('round__number').textContent = `Round ${LASTROUND.ID} was at ${last_round_start_time}.
                                 Round ${LASTROUND.ID + 1} started at ${current_round_time} and should end at ${next_round_time}.`;
@@ -152,6 +224,15 @@
                         } else {
                             ENGINE_STATUS.textContent = '';
                         }
+<<<<<<< ours
+=======
+                        if (STOPTIME && Date.now() < new Date(STOPTIME)) {
+                            const diff = Math.ceil((new Date(STOPTIME) - Date.now()) / 1000);
+                            ENGINE_STOP_STATUS.textContent = `Engine will stop in ${diff}s`;
+                        } else {
+                            ENGINE_STOP_STATUS.textContent = '';
+                        }
+>>>>>>> theirs
                     }
 
                     getEngineData()
