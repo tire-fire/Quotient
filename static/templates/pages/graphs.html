@@ -142,10 +142,16 @@
                                         } else {
                                             img = UNKIMG
                                         }
+
+                                        const teamID = TEAMMAP[series[i].name]
+                                        const serviceName = status.x
+                                        const pointID = `status-${teamID}-${j}`
+
                                         let point = {
-                                            x: status.x,
+                                            x: serviceName,
                                             y: STATUSCHART.w.globals.yRange[0],
                                             seriesIndex: i,
+                                            id: pointID,
                                             image: {
                                                 path: img,
                                                 offsetY: (5+(series.length-1)*17)-i*17,
@@ -153,6 +159,16 @@
                                         }
 
                                         STATUSCHART.addPointAnnotation(point)
+
+                                        const el = document.getElementById(pointID)
+                                        if (el) {
+                                            el.style.cursor = 'pointer'
+                                            el.addEventListener('click', () => {
+                                                if (teamID !== undefined) {
+                                                    window.location.href = `/services?team=${teamID}&service=${serviceName}&round=${ROUNDID}`
+                                                }
+                                            })
+                                        }
                                     }
                                 }
                             }
