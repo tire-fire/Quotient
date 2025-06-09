@@ -11,8 +11,11 @@ import (
 	"sync"
 )
 
+// getTeams abstracts db.GetTeams so tests can override it without requiring a database
+var getTeams = db.GetTeams
+
 func (se *ScoringEngine) LoadCredentials() error {
-	teams, err := db.GetTeams()
+	teams, err := getTeams()
 	if err != nil {
 		return fmt.Errorf("failed to get teams: %v", err)
 	}
