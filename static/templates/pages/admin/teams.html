@@ -5,7 +5,7 @@
             <div class="row">
                 <h3>Set Team Identifiers</h3>
                 <form onsubmit="return formSubmit(event)">
-                    <table class="table">
+                    <table class="table" id="team-table">
                         <thead>
                             <tr>
                                 <th>Team Name</th>
@@ -30,7 +30,7 @@
                 fetch('/api/teams')
                     .then(response => response.json())
                     .then(data => {
-                        const TBODY = document.querySelector('tbody');
+                        const TBODY = document.querySelector('#team-table tbody');
                         data.forEach(team => {
                             const ROW = document.createElement('tr');
                             const NAME_CELL = document.createElement('td');
@@ -87,7 +87,7 @@
                 const formSubmit = (event) => {
                     event.preventDefault();
                     const teamsData = [];
-                    const rows = document.querySelectorAll('tbody tr');
+                    const rows = document.querySelectorAll('#team-table tbody tr');
                     rows.forEach(row => {
                         const teamID = parseInt(row.querySelector('input').getAttribute('aria-describedby').split('-')[2]);
                         const identifier = row.querySelector('input').value;
