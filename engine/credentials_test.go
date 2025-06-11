@@ -127,3 +127,25 @@ func TestGetCredlists(t *testing.T) {
 		t.Fatalf("unexpected name: %v", name)
 	}
 }
+
+func TestLoadCredentialsMissingFile(t *testing.T) {
+	cleanup := withTeams(t, []db.TeamSchema{{ID: 1}})
+	defer cleanup()
+
+	tmp := t.TempDir()
+	oldWd, _ := os.Getwd()
+	os.Chdir(tmp)
+	defer os.Chdir(oldWd)
+
+	os.MkdirAll("config/credlists", 0o755)
+
+	conf := &config.ConfigSettings{
+		CredlistSettings: config.CredlistConfig{
+			Credlist: []config.Credlist{{CredlistName: "list", CredlistPath: "missing.csv"}},
+		},
+	}
+	se := &ScoringEngine{Config: conf, CredentialsMutex: map[uint]*sync.Mutex{}}
+	if err := se.LoadCredentials(); err == nil {
+		t.Fatal("expected error for missing source file")
+	}
+}
