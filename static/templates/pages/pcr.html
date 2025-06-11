@@ -37,6 +37,10 @@
                         <textarea class="form-control me-2" id="pcr__credentials" rows="10"
                             placeholder="username,password"></textarea>
                     </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="strip-quotes" checked>
+                        <label class="form-check-label" for="strip-quotes">Strip Quotes</label>
+                    </div>
                     <button type="submit" class="btn btn-primary mt-2">Submit</button>
                 </form>
                 <div id="credlist__example" class="my-2">
@@ -110,7 +114,11 @@
         event.preventDefault()
         const newcreds = document.getElementById("pcr__credentials").value.split("\n")
             .filter(l => l.trim() !== "")
-        const unquote = (str) => {
+        const stripQuotes = document.getElementById("strip-quotes").checked
+        const maybeUnquote = (str) => {
+            if (!stripQuotes) {
+                return str
+            }
             if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
                 return str.slice(1, -1)
             }
@@ -121,8 +129,8 @@
         const passwords = []
         for (const cred of newcreds) {
             const parts = cred.split(/,(.+)/)
-            const username = unquote(parts[0] ?? "")
-            const password = unquote(parts[1] ?? "")
+            const username = maybeUnquote(parts[0] ?? "")
+            const password = maybeUnquote(parts[1] ?? "")
             usernames.push(username)
             passwords.push(password)
         }
