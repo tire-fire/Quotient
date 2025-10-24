@@ -206,7 +206,7 @@ func auth(username string, password string) (map[string]any, error) {
 		searchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"dn"},
 			nil,
 		)
@@ -231,7 +231,7 @@ func auth(username string, password string) (map[string]any, error) {
 		roleSearchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
 			nil,
 		)
@@ -309,7 +309,7 @@ func findRolesByUsername(username string) ([]string, error) {
 		searchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
 			nil,
 		)
