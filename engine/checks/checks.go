@@ -20,6 +20,9 @@ type Runner interface {
 	GetName() string
 	GetAttempts() int
 	GetCredlists() []string
+	GetTarget() string
+	GetTimeout() int
+	GetPort() int
 }
 
 // services will inherit Service so that config.Config can be read from file, but will not be used after initial read
@@ -72,6 +75,18 @@ func (service *Service) GetAttempts() int {
 
 func (service *Service) GetCredlists() []string {
 	return service.CredLists
+}
+
+func (service *Service) GetTarget() string {
+	return service.Target
+}
+
+func (service *Service) GetTimeout() int {
+	return service.Timeout
+}
+
+func (service *Service) GetPort() int {
+	return service.Port
 }
 
 func (service *Service) SetCredlists(lists []string) {
@@ -164,7 +179,7 @@ func (service *Service) Run(teamID uint, teamIdentifier string, roundID uint, re
 		RoundID:     roundID,
 	}
 
-	slog.Debug("Running check", "teamID", teamID, "serviceName", service.Name, "target", service.Target)
+	slog.Debug("Running check", "teamID", teamID, "serviceName", service.Name, "target", service.Target, "serviceType", service.ServiceType, "timeout", service.Timeout)
 	response := make(chan Result)
 
 	go definition(teamID, teamIdentifier, checkResult, response)
@@ -176,7 +191,18 @@ func (service *Service) Run(teamID uint, teamIdentifier string, roundID uint, re
 		return
 	// timeout
 	case <-time.After(time.Duration(service.Timeout) * time.Second):
-		checkResult.Error = "check timeout exceeded"
+		checkResult.Error = fmt.Sprintf("check timeout exceeded: %s check for %s (target: %s) did not complete within %ds",
+			service.ServiceType, service.Name, service.Target, service.Timeout)
+		if checkResult.Debug == "" {
+			checkResult.Debug = fmt.Sprintf("Check configuration: type=%s port=%d", service.ServiceType, service.Port)
+		}
+		slog.Warn("Check timeout exceeded",
+			"teamID", teamID,
+			"serviceName", service.Name,
+			"serviceType", service.ServiceType,
+			"target", service.Target,
+			"timeout", service.Timeout,
+			"roundID", roundID)
 		resultsChan <- checkResult
 		return
 	}

@@ -22,31 +22,42 @@ type Custom struct {
 }
 
 func (c Custom) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
-	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
+	// Prepare command substitution early so it's available for timeout debugging
+	var username, password string
+	var formedCommand string
+	var credErr error
 
-		var username, password string
-		var err error
-		if len(c.CredLists) > 0 {
-			username, password, err = c.getCreds(teamID)
-			if err != nil {
-				checkResult.Error = "error getting creds"
-				checkResult.Debug = err.Error()
-				response <- checkResult
-				return
-			}
-		}
+	if len(c.CredLists) > 0 {
+		username, password, credErr = c.getCreds(teamID)
+	}
 
-		// Replace command input keywords
-		formedCommand := c.Command
-		formedCommand = strings.Replace(formedCommand, "ROUND", strconv.FormatUint(uint64(roundID), 10), -1)
-		formedCommand = strings.Replace(formedCommand, "TARGET", c.Target, -1) // is there a case where u need IP and FQDN?
-		formedCommand = strings.Replace(formedCommand, "TEAMIDENTIFIER", teamIdentifier, -1)
+	// Replace command input keywords
+	formedCommand = c.Command
+	formedCommand = strings.Replace(formedCommand, "ROUND", strconv.FormatUint(uint64(roundID), 10), -1)
 
-		// We shell escape username and password, who knows what format they are
+	// Replace underscore in target with team identifier before substitution
+	target := strings.Replace(c.Target, "_", teamIdentifier, -1)
+	formedCommand = strings.Replace(formedCommand, "TARGET", target, -1)
+	formedCommand = strings.Replace(formedCommand, "TEAMIDENTIFIER", teamIdentifier, -1)
+
+	// Shell escape username and password
+	if len(c.CredLists) > 0 {
 		formedCommand = strings.Replace(formedCommand, "USERNAME", shellescape.Quote(username), -1)
 		formedCommand = strings.Replace(formedCommand, "PASSWORD", shellescape.Quote(password), -1)
-		slog.Debug("CUSTOM CHECK COMMAND", "command", formedCommand)
+	}
+
+	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
+		// Set formed command in debug immediately so it's available on timeout
 		checkResult.Debug = formedCommand
+
+		if credErr != nil {
+			checkResult.Error = "error getting creds"
+			checkResult.Debug = credErr.Error()
+			response <- checkResult
+			return
+		}
+
+		slog.Debug("CUSTOM CHECK COMMAND", "command", formedCommand)
 
 		// Create command with timeout context
 		timeout := time.Duration(c.Timeout) * time.Second

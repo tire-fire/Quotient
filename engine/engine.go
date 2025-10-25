@@ -71,10 +71,12 @@ func NewEngine(conf *config.ConfigSettings, configPath string) *ScoringEngine {
 }
 
 func (se *ScoringEngine) Start() {
+	slog.Info("Engine Start() called")
 	if t, err := db.GetLastRound(); err != nil {
 		slog.Error("failed to get last round", "error", err)
 	} else {
 		se.CurrentRound = uint(t.ID) + 1
+		slog.Info("Set CurrentRound from database", "round", se.CurrentRound)
 	}
 
 	if err := db.LoadUptimes(&se.UptimePerService); err != nil {
@@ -116,20 +118,26 @@ func (se *ScoringEngine) Start() {
 	eventsChannel := events.Channel()
 
 	// engine loop
+	slog.Info("Launching engine loop goroutine")
 	go func() {
+		slog.Info("Engine loop goroutine started")
 		for {
 			slog.Info("Queueing up for round", "round", se.CurrentRound)
+			slog.Info("Waiting for engine unpause", "isPaused", se.IsEnginePaused)
 			se.EnginePauseWg.Wait()
+			slog.Info("Engine unpaused, entering select")
 			select {
 			case msg := <-eventsChannel:
-				slog.Info("Received message", "message", msg.Payload)
+				slog.Info("Received message from events channel", "message", msg.Payload)
 				if msg.Payload == "reset" {
 					slog.Info("Engine loop reset event received while waiting, quitting...")
 					return
 				} else {
+					slog.Info("Non-reset message received, continuing loop")
 					continue
 				}
 			default:
+				slog.Info("No events in channel, starting round")
 				slog.Info("Starting round", "round", se.CurrentRound)
 				se.CurrentRoundStartTime = time.Now()
 				se.NextRoundStartTime = time.Now().Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second)
@@ -441,6 +449,13 @@ func (se *ScoringEngine) rvb() error {
 				results = []checks.Result{}
 				break
 			} else if err != nil {
+				// Check if the timeout context has expired
+				if timeoutCtx.Err() != nil {
+					slog.Warn("Round deadline exceeded while waiting for results", "remaining", runners-i, "error", err)
+					// Clear the results, since we didn't collect everything in time
+					results = []checks.Result{}
+					break
+				}
 				slog.Error("Failed to fetch results from Redis:", "error", err)
 				time.Sleep(2 * time.Second)
 				continue

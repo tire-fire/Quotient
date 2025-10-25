@@ -204,15 +204,27 @@ func handleTask(ctx context.Context, rdb *redis.Client, runner checks.Runner, ta
 
 		case <-checkCtx.Done():
 			result.Status = false
-			result.Debug = "round ended before check completed"
-			result.Error = "timeout"
 			result.TeamID = task.TeamID
 			result.ServiceName = task.ServiceName
 			result.ServiceType = task.ServiceType
 			result.RoundID = task.RoundID
+			result.Error = "timeout"
 
-			log.Printf("[Runner] Check timed out: RoundID=%d TeamID=%d ServiceType=%s",
-				task.RoundID, task.TeamID, task.ServiceType)
+			target := runner.GetTarget()
+			timeout := runner.GetTimeout()
+			port := runner.GetPort()
+
+			result.Target = target
+			if port > 0 {
+				result.Debug = fmt.Sprintf("Round deadline exceeded: %s check to %s:%d (timeout: %ds) did not complete before round ended at %s",
+					task.ServiceType, target, port, timeout, task.Deadline.Format(time.RFC3339))
+			} else {
+				result.Debug = fmt.Sprintf("Round deadline exceeded: %s check to %s (timeout: %ds) did not complete before round ended at %s",
+					task.ServiceType, target, timeout, task.Deadline.Format(time.RFC3339))
+			}
+
+			log.Printf("[Runner] Check timed out: RoundID=%d TeamID=%d ServiceType=%s ServiceName=%s Target=%s Deadline=%s",
+				task.RoundID, task.TeamID, task.ServiceType, task.ServiceName, target, task.Deadline.Format(time.RFC3339))
 		}
 
 		// Break if successful or deadline passed

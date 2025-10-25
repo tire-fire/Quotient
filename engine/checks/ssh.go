@@ -41,6 +41,13 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
+		// Set credentials immediately so they're visible on timeout
+		if c.PrivKey != "" {
+			checkResult.Debug = fmt.Sprintf("Attempting SSH with username=%s key=%s", username, c.PrivKey)
+		} else {
+			checkResult.Debug = fmt.Sprintf("Attempting SSH with username=%s password=%s", username, password)
+		}
+
 		config := &ssh.ClientConfig{
 			User:            username,
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
@@ -93,11 +100,10 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		if err != nil {
 			if c.PrivKey != "" {
 				checkResult.Error = "error logging in to ssh server with private key " + c.PrivKey
-				checkResult.Debug = "error: " + err.Error()
 			} else {
-				checkResult.Error = "error logging in to ssh server for creds " + username + ":" + password
-				checkResult.Debug = "error: " + err.Error()
+				checkResult.Error = "error logging in to ssh server"
 			}
+			checkResult.Debug += " | Connection error: " + err.Error()
 			response <- checkResult
 			return
 		}
@@ -107,7 +113,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		session, err := conn.NewSession()
 		if err != nil {
 			checkResult.Error = "unable to create ssh session"
-			checkResult.Debug = err.Error()
+			checkResult.Debug += " | Session error: " + err.Error()
 			response <- checkResult
 			return
 		}
@@ -123,7 +129,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		// Request pseudo terminal
 		if err := session.RequestPty("xterm", 40, 80, modes); err != nil {
 			checkResult.Error = "couldn't allocate pts"
-			checkResult.Debug = err.Error()
+			checkResult.Debug += " | PTY error: " + err.Error()
 			response <- checkResult
 			return
 		}
@@ -132,7 +138,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		stdin, err := session.StdinPipe()
 		if err != nil {
 			checkResult.Error = "couldn't get stdin pipe"
-			checkResult.Debug = err.Error()
+			checkResult.Debug += " | Stdin error: " + err.Error()
 			response <- checkResult
 			return
 		}
@@ -145,7 +151,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		// Start remote shell
 		if err := session.Shell(); err != nil {
 			checkResult.Error = "failed to start shell"
-			checkResult.Debug = "error: " + err.Error()
+			checkResult.Debug += " | Shell error: " + err.Error()
 			response <- checkResult
 			return
 		}
@@ -153,12 +159,13 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		// If any commands specified, run a random one
 		if len(c.Command) > 0 {
 			r := c.Command[rand.Intn(len(c.Command))]
+			checkResult.Debug += " | Running command: " + r.Command
 			fmt.Fprintln(stdin, r.Command)
 			time.Sleep(time.Duration(int(time.Duration(c.Timeout)*time.Second) / 8)) // command wait time
 			if r.Contains {
 				if !strings.Contains(stdoutBytes.String(), r.Output) {
 					checkResult.Error = "command output didn't contain string"
-					checkResult.Debug = "command output of '" + r.Command + "' didn't contain string '" + r.Output + "': " + stdoutBytes.String() + ",  " + stderrBytes.String()
+					checkResult.Debug += " | Expected string '" + r.Output + "' not found in output: " + stdoutBytes.String()
 					response <- checkResult
 					return
 				}
@@ -166,13 +173,13 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 				re := regexp.MustCompile(r.Output)
 				if !re.Match(stdoutBytes.Bytes()) {
 					checkResult.Error = "command output didn't match regex"
-					checkResult.Debug = "command output'" + r.Command + "' didn't match regex '" + r.Output
+					checkResult.Debug += " | Regex '" + r.Output + "' did not match output"
 					response <- checkResult
 					return
 				} else {
 					if strings.TrimSpace(stdoutBytes.String()) != r.Output {
 						checkResult.Error = "command output didn't match string"
-						checkResult.Debug = "command output of '" + r.Command + "' didn't match string '" + r.Output + "' " + strings.TrimSpace(stdoutBytes.String())
+						checkResult.Debug += " | Expected '" + r.Output + "' but got '" + strings.TrimSpace(stdoutBytes.String()) + "'"
 						response <- checkResult
 						return
 					}
@@ -180,7 +187,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			} else {
 				if stderrBytes.Len() != 0 {
 					checkResult.Error = "command returned an error"
-					checkResult.Debug = "command stderr was not empty: " + stderrBytes.String()
+					checkResult.Debug += " | Stderr: " + stderrBytes.String()
 					response <- checkResult
 					return
 				}
@@ -188,7 +195,7 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		}
 		checkResult.Status = true
 		checkResult.Points = c.Points
-		checkResult.Debug = "creds used were " + username + ":" + password
+		checkResult.Debug += " | Success"
 		response <- checkResult
 	}
 
