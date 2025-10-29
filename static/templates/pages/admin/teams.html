@@ -1,7 +1,8 @@
 {{ define "page" }}
 <div class="d-flex w-100 h-100">
-    <div class="pt-4 w-100 h-100 overflow-y-scroll">
-        <div class="container">
+    <div class="w-100 h-100 overflow-y-scroll">
+        {{ template "admin-subnav" . }}
+        <div class="container pt-4">
             <!-- Alert for feedback messages -->
             <div id="alertContainer" class="row mb-3" style="display: none;">
                 <div id="alertMessage" class="alert" role="alert"></div>

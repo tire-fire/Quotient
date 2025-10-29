@@ -1,7 +1,8 @@
 {{ define "page" }}
 <div class="d-flex w-100 h-100">
-    <div class="pt-4 w-100 h-100 overflow-y-scroll">
-        <div class="container">
+    <div class="w-100 h-100 overflow-y-scroll">
+        {{ template "admin-subnav" . }}
+        <div class="container pt-4">
             <div class="row">
                 <div class="row mb-3">
                     <div class="mb-3">
@@ -79,9 +80,14 @@
                 let CURRENTROUND = 0;
                 let NEXTROUND = 0;
                 let RUNNING = false;
-                let ROUNDDURATION = 60; // Default to 60 seconds, will be calculated from start/end times
+                let ROUNDDURATION = 60;
 
-                // Function to update runner tasks visualization
+                const knownRunners = new Set(JSON.parse(sessionStorage.getItem('knownRunners') || '[]'));
+
+                function saveKnownRunners() {
+                    sessionStorage.setItem('knownRunners', JSON.stringify([...knownRunners]));
+                }
+
                 function updateRunnerTasks() {
                     if (!autoRefreshEnabled) return;
 
@@ -99,11 +105,17 @@
                             // Group tasks by runner
                             const runnerMap = new Map();
                             const activeRunners = new Set();
+                            let knownRunnersChanged = false;
 
                             // Process running tasks to get active runners
                             runningTasks.forEach(task => {
                                 if (task.runner_id) {
                                     activeRunners.add(task.runner_id);
+
+                                    if (!knownRunners.has(task.runner_id)) {
+                                        knownRunners.add(task.runner_id);
+                                        knownRunnersChanged = true;
+                                    }
 
                                     if (!runnerMap.has(task.runner_id)) {
                                         runnerMap.set(task.runner_id, []);
@@ -111,27 +123,34 @@
                                     runnerMap.get(task.runner_id).push(task);
                                 }
                             });
-
-                            // Get all known runners
-                            const allRunners = new Set();
-                            runningTasks.forEach(task => {
-                                if (task.runner_id) allRunners.add(task.runner_id);
-                            });
                             successTasks.forEach(task => {
-                                if (task.runner_id) allRunners.add(task.runner_id);
+                                if (task.runner_id && !knownRunners.has(task.runner_id)) {
+                                    knownRunners.add(task.runner_id);
+                                    knownRunnersChanged = true;
+                                }
                             });
                             failedTasks.forEach(task => {
-                                if (task.runner_id) allRunners.add(task.runner_id);
+                                if (task.runner_id && !knownRunners.has(task.runner_id)) {
+                                    knownRunners.add(task.runner_id);
+                                    knownRunnersChanged = true;
+                                }
                             });
 
-                            // Add runners that aren't processing tasks
                             if (tasks.all_runners) {
-                                tasks.all_runners.forEach(id => allRunners.add(id));
+                                tasks.all_runners.forEach(id => {
+                                    if (!knownRunners.has(id)) {
+                                        knownRunners.add(id);
+                                        knownRunnersChanged = true;
+                                    }
+                                });
                             }
 
-                            // Update runner counts
+                            if (knownRunnersChanged) {
+                                saveKnownRunners();
+                            }
+
                             const activeRunnersCount = activeRunners.size;
-                            const totalRunnersCount = allRunners.size;
+                            const totalRunnersCount = knownRunners.size;
 
                             document.getElementById('activeRunnersCount').textContent = activeRunnersCount;
                             document.getElementById('totalRunnersCount').textContent = totalRunnersCount;

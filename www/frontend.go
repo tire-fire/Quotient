@@ -123,29 +123,26 @@ func (router *Router) PcrPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (router *Router) AdminPage(w http.ResponseWriter, r *http.Request) {
-	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/pages/admin/admin.html"))
-	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin"})); err != nil {
-		panic(err)
-	}
+	http.Redirect(w, r, "/admin/engine", http.StatusTemporaryRedirect)
 }
 
 func (router *Router) AdministrateTeamsPage(w http.ResponseWriter, r *http.Request) {
-	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/pages/admin/teams.html"))
-	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin"})); err != nil {
+	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/partials/admin-subnav.html", "./static/templates/pages/admin/teams.html"))
+	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin", "page": "teams"})); err != nil {
 		panic(err)
 	}
 }
 
 func (router *Router) AdministrateEnginePage(w http.ResponseWriter, r *http.Request) {
-	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/pages/admin/engine.html"))
-	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin"})); err != nil {
+	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/partials/admin-subnav.html", "./static/templates/pages/admin/engine.html"))
+	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin", "page": "engine"})); err != nil {
 		panic(err)
 	}
 }
 
 func (router *Router) AdministrateRunnersPage(w http.ResponseWriter, r *http.Request) {
-	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/pages/admin/runners.html"))
-	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin"})); err != nil {
+	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/partials/admin-subnav.html", "./static/templates/pages/admin/runners.html"))
+	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Admin", "page": "runners"})); err != nil {
 		panic(err)
 	}
 }
