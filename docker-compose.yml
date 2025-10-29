@@ -1,14 +1,17 @@
 services:
   db:
+    profiles: [disabled]  # remove to enable
     container_name: quotient_database
-    image: postgres
+    image: postgres:17
     restart: always
+    command: "-c wal_keep_size=1GB"
     env_file:
       - .env
     networks:
       - quotient_network
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./prepare-postgres-replication.sh:/docker-entrypoint-initdb.d/prepare-postgres-replication.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -27,9 +30,9 @@ services:
       - .env
     ports:
       - 80:80
-    depends_on:
-      db:
-        condition: service_healthy
+    #depends_on:
+    #  db:
+    #    condition: service_healthy
     networks:
       - quotient_network
     volumes:
@@ -70,8 +73,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      db:
-        condition: service_healthy
+      #db:
+      #  condition: service_healthy
     networks:
       - quotient_network
     volumes:

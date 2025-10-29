@@ -68,7 +68,7 @@ func (router *Router) Start() {
 	|                                         |
 	******************************************/
 
-	ALLAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Authentication("team", "admin", "red"))
+	ALLAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Authentication("team", "admin", "red", "inject"))
 	// general auth API routes
 	mux.HandleFunc("GET /api/logout", ALLAUTH(api.Logout))
 
