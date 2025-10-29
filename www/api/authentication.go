@@ -189,6 +189,11 @@ func auth(username string, password string) (map[string]any, error) {
 			return map[string]any{"username": username, "authSource": "local"}, nil
 		}
 	}
+	for _, inject := range conf.Inject {
+		if username == inject.Name && password == inject.Pw {
+			return map[string]any{"username": username}, nil
+		}
+	}
 
 	// auth from other sources
 	// if ldap configs are present, try to auth against ldap
@@ -208,7 +213,7 @@ func auth(username string, password string) (map[string]any, error) {
 		searchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"dn"},
 			nil,
 		)
@@ -233,7 +238,7 @@ func auth(username string, password string) (map[string]any, error) {
 		roleSearchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
 			nil,
 		)
@@ -255,6 +260,10 @@ func auth(username string, password string) (map[string]any, error) {
 
 				if memberOf == conf.LdapSettings.LdapTeamGroupDn {
 					return map[string]any{"username": username, "authSource": "ldap"}, nil
+				}
+
+				if memberOf == conf.LdapSettings.LdapInjectGroupDn {
+					return map[string]any{"username": username}, nil
 				}
 			}
 		}
@@ -282,6 +291,11 @@ func findRolesByUsername(username string, authSource string) ([]string, error) {
 		// OIDC user not found in cache after server restart
 		// User will need to re-authenticate
 		return nil, errors.New("OIDC session expired - please login again")
+	}
+	for _, inject := range conf.Inject {
+		if username == inject.Name {
+			roles = append(roles, "inject")
+		}
 	}
 
 	// Check local users only if auth source is local
@@ -326,7 +340,7 @@ func findRolesByUsername(username string, authSource string) ([]string, error) {
 		searchRequest := ldap.NewSearchRequest(
 			conf.LdapSettings.LdapSearchBaseDn,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", username),
+			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
 			nil,
 		)
@@ -348,6 +362,10 @@ func findRolesByUsername(username string, authSource string) ([]string, error) {
 
 				if memberOf == conf.LdapSettings.LdapTeamGroupDn {
 					roles = append(roles, "team")
+				}
+
+				if memberOf == conf.LdapSettings.LdapInjectGroupDn {
+					roles = append(roles, "inject")
 				}
 			}
 		}

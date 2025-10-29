@@ -425,7 +425,9 @@
     const PLACEHOLDER_TAB = document.getElementById("tab--placeholder")
     const PLACEHOLDER_PANE = document.getElementById("pane--placeholder")
 
-    fetch("/api/injects")
+    // Function to fetch injects data and update the UI
+    function fetchAndUpdateInjects() {
+        fetch("/api/injects")
         .then((response) => {
             if (!response.ok) {
                 Promise.reject(response)
@@ -506,12 +508,16 @@
                 subject.textContent = inject.Title
                                 
                 let descTemp = document.createElement("div")
-                descTemp.innerHTML = `
-                <p>${inject.Description}</p>
+
+                let descPara = document.createElement("p")
+                descPara.textContent = inject.Description
+                descTemp.appendChild(descPara)
+
+                descTemp.innerHTML += `
                 <h5>Inject Details</h5>
                 <ul>
-                    <li id="pane__due--${inject.ID}"><p><strong>Due Time:</strong> ${inject.DueTime.toLocaleString()}</p></li>
-                    <li id="pane__close--${inject.ID}"><p><strong>Close Time:</strong> ${inject.CloseTime.toLocaleString()}</p></li>
+                    <li><p><strong>Due Time:</strong> <span id="pane__due--${inject.ID}">${inject.DueTime.toLocaleString()}</span></p></li>
+                    <li><p><strong>Close Time:</strong> <span id="pane__close--${inject.ID}">${inject.CloseTime.toLocaleString()}</span></p></li>
                     </ul>
                     `
                     description.appendChild(descTemp)
@@ -559,5 +565,13 @@
         .catch((error) => {
             console.error(error)
         });
+    }
+
+    // Initial load
+    fetchAndUpdateInjects();
+
+    // Set up auto-refresh every 30 seconds
+    const REFRESH_INTERVAL = 30000; // 30 seconds
+    setInterval(fetchAndUpdateInjects, REFRESH_INTERVAL);
 </script>
 {{ end }}
