@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -25,9 +26,9 @@ func GetInjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if not admin filter out injects that are not open yet
+	// if not admin or inject role, filter out injects that are not open yet
 	req_roles := r.Context().Value("roles").([]string)
-	if !slices.Contains(req_roles, "admin") {
+	if !slices.Contains(req_roles, "admin") && !slices.Contains(req_roles, "inject") {
 		openInjects := make([]db.InjectSchema, 0)
 		for _, a := range data {
 			if time.Now().After(a.OpenTime) {
@@ -46,7 +47,7 @@ func GetInjects(w http.ResponseWriter, r *http.Request) {
 			w.Write(d)
 			return
 		}
-		if !slices.Contains(req_roles, "admin") {
+		if !slices.Contains(req_roles, "admin") && !slices.Contains(req_roles, "inject") {
 			var mySubmissions []db.SubmissionSchema
 			for _, submission := range data[i].Submissions {
 				if submission.Team.Name == r.Context().Value("username") {
@@ -108,9 +109,9 @@ func DownloadInjectFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if not admin, check if the inject is open
+	// if not admin or inject role, check if the inject is open
 	req_roles := r.Context().Value("roles").([]string)
-	if !slices.Contains(req_roles, "admin") && time.Now().Before(inject.OpenTime) {
+	if !slices.Contains(req_roles, "admin") && !slices.Contains(req_roles, "inject") && time.Now().Before(inject.OpenTime) {
 		w.WriteHeader(http.StatusNotFound)
 		data := map[string]any{"error": "Inject not found"} // don't leak if inject is not open
 		d, _ := json.Marshal(data)
@@ -163,6 +164,7 @@ func DownloadInjectFile(w http.ResponseWriter, r *http.Request) {
 
 func CreateInject(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		slog.Error("Failed to parse multipart form for inject creation", "error", err, "user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Failed to parse multipart form"}
 		d, _ := json.Marshal(data)
@@ -177,6 +179,13 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 	closeTimeStr := r.FormValue("close-time")
 
 	if title == "" || description == "" || openTimeStr == "" || dueTimeStr == "" || closeTimeStr == "" {
+		slog.Error("Missing required fields for inject creation",
+			"title_empty", title == "",
+			"description_empty", description == "",
+			"openTime_empty", openTimeStr == "",
+			"dueTime_empty", dueTimeStr == "",
+			"closeTime_empty", closeTimeStr == "",
+			"user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Missing required fields"}
 		d, _ := json.Marshal(data)
@@ -186,6 +195,7 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 
 	openTime, err := time.Parse(time.RFC3339, openTimeStr)
 	if err != nil {
+		slog.Error("Invalid open time format for inject creation", "error", err, "value", openTimeStr, "user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Invalid open time format"}
 		d, _ := json.Marshal(data)
@@ -195,6 +205,7 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 
 	dueTime, err := time.Parse(time.RFC3339, dueTimeStr)
 	if err != nil {
+		slog.Error("Invalid due time format for inject creation", "error", err, "value", dueTimeStr, "user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Invalid due time format"}
 		d, _ := json.Marshal(data)
@@ -204,6 +215,7 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 
 	closeTime, err := time.Parse(time.RFC3339, closeTimeStr)
 	if err != nil {
+		slog.Error("Invalid close time format for inject creation", "error", err, "value", closeTimeStr, "user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Invalid close time format"}
 		d, _ := json.Marshal(data)
@@ -228,6 +240,10 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 
 	// ensure times are in order
 	if inject.OpenTime.After(inject.DueTime) {
+		slog.Error("Open time after due time for inject creation",
+			"open_time", inject.OpenTime,
+			"due_time", inject.DueTime,
+			"user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Open time must be before due time"}
 		d, _ := json.Marshal(data)
@@ -236,6 +252,10 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if inject.DueTime.After(inject.CloseTime) {
+		slog.Error("Due time after close time for inject creation",
+			"due_time", inject.DueTime,
+			"close_time", inject.CloseTime,
+			"user", r.Context().Value("username"))
 		w.WriteHeader(http.StatusBadRequest)
 		data := map[string]any{"error": "Due time must be before close time"}
 		d, _ := json.Marshal(data)
@@ -246,6 +266,7 @@ func CreateInject(w http.ResponseWriter, r *http.Request) {
 	// create the inject, if successful id will be set in inject
 	if inject, err = db.CreateInject(inject); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			slog.Error("Duplicate inject title", "title", inject.Title, "user", r.Context().Value("username"))
 			w.WriteHeader(http.StatusBadRequest)
 			data := map[string]any{"error": "Inject with the same title already exists"}
 			d, _ := json.Marshal(data)

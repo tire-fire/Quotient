@@ -188,7 +188,7 @@ func auth(username string, password string) (map[string]any, error) {
 	}
 	for _, inject := range conf.Inject {
 		if username == inject.Name && password == inject.Pw {
-			return map[string]any{"username": username}, nil
+			return map[string]any{"username": username, "authSource": "local"}, nil
 		}
 	}
 
@@ -256,7 +256,7 @@ func auth(username string, password string) (map[string]any, error) {
 				}
 
 				if memberOf == conf.LdapSettings.LdapInjectGroupDn {
-					return map[string]any{"username": username}, nil
+					return map[string]any{"username": username, "authSource": "ldap"}, nil
 				}
 			}
 			if hasAuthorizedRole {

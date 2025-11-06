@@ -2,7 +2,10 @@
 <div class="d-flex w-100 h-100">
     <div class="nav-pills d-flex flex-column h-100 overflow-y-scroll justify-content-start align-items-center bg-body-secondary"
         role="tablist" id="tab-container">
-        {{ if contains .roles "admin" }}
+        <button class="btn btn-warning rounded-0 w-100 d-none" onclick="location.reload()" id="refresh--btn">
+            Refresh
+        </button>
+        {{ if or (contains .roles "admin") (contains .roles "inject") }}
         <button class="btn btn-primary rounded-0 w-100" data-bs-toggle="modal" data-bs-target="#create__form">
             Create Inject
         </button>
@@ -84,15 +87,19 @@
                     method: "POST",
                     body: PAYLOAD,
                 }).then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                     return response.json();
                 }).then((data) => {
                     if (data.error) {
-                        console.error(data.error);
+                        alert(`Error creating inject: ${data.error}`);
                         return;
                     } else {
-                        console.log(data);
                         window.location.reload();
                     }
+                }).catch((error) => {
+                    alert(`Failed to create inject: ${error.message}`);
                 });
             };
         </script>
@@ -243,15 +250,19 @@
                     method: "POST",
                     body: PAYLOAD,
                 }).then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                     return response.json();
                 }).then((data) => {
                     if (data.error) {
-                        console.error(data.error);
+                        alert(`Error updating inject: ${data.error}`);
                         return;
                     } else {
-                        console.log(data);
                         window.location.reload();
                     }
+                }).catch((error) => {
+                    alert(`Failed to update inject: ${error.message}`);
                 });
             };
         </script>
@@ -286,15 +297,19 @@
                 fetch(`/api/injects/${ID}`, {
                     method: "DELETE",
                 }).then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                     return response.json();
                 }).then((data) => {
                     if (data.error) {
-                        console.error(data.error);
+                        alert(`Error deleting inject: ${data.error}`);
                         return;
                     } else {
-                        console.log(data);
                         window.location.reload();
                     }
+                }).catch((error) => {
+                    alert(`Failed to delete inject: ${error.message}`);
                 });
             };
         </script>
@@ -334,7 +349,7 @@
                     <span id="pane__from--placeholder" class="placeholder col-4"></span>
                     <span id="pane__subject--placeholder" class="placeholder col-6"></span>
                     <hr class="my-4">
-                    {{ if contains .roles "admin" }}
+                    {{ if or (contains .roles "admin") (contains .roles "inject") }}
                     <div class="d-flex">
                         <button class="btn btn-outline-secondary rounded-1 m-2" data-bs-toggle="modal"
                             data-bs-target="#edit__form">
@@ -375,15 +390,19 @@
                                         method: "POST",
                                         body: PAYLOAD,
                                     }).then((response) => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP ${response.status}`);
+                                        }
                                         return response.json();
                                     }).then((data) => {
                                         if (data.error) {
-                                            console.error(data.error);
+                                            alert(`Error submitting inject: ${data.error}`);
                                             return;
                                         } else {
-                                            console.log(data);
                                             window.location.reload();
                                         }
+                                    }).catch((error) => {
+                                        alert(`Failed to submit inject: ${error.message}`);
                                     });
                                 };
                             </script>
@@ -424,17 +443,31 @@
     const PANE_CONTAINER = document.getElementById("pane-container")
     const PLACEHOLDER_TAB = document.getElementById("tab--placeholder")
     const PLACEHOLDER_PANE = document.getElementById("pane--placeholder")
+    const REFRESH_BTN = document.getElementById("refresh--btn")
+
+    let prevData;
 
     // Function to fetch injects data and update the UI
     function fetchAndUpdateInjects() {
         fetch("/api/injects")
         .then((response) => {
             if (!response.ok) {
-                Promise.reject(response)
+                throw new Error(`HTTP ${response.status}`)
             }
             return response.json()
         })
         .then((data) => {
+            PLACEHOLDER_TAB.classList.add("d-none")
+            PLACEHOLDER_PANE.classList.add("d-none")
+            if (!data || data.length === 0) {
+                return
+            }
+            if (prevData === undefined) {
+                prevData = data
+            } else if (JSON.stringify(prevData) != JSON.stringify(data)) {
+                REFRESH_BTN.classList.remove("d-none")
+                return
+            }
             let tabs = [];
             let panes = [];
             for (const inject of data) {
@@ -443,8 +476,8 @@
                 inject.CloseTime = (new Date(inject.CloseTime))
                 let tab = PLACEHOLDER_TAB.cloneNode(true)
                 let pane = PLACEHOLDER_PANE.cloneNode(true)
-                tab.classList.remove("active", "placeholder-glow")
-                pane.classList.remove("active", "placeholder-glow")
+                tab.classList.remove("active", "placeholder-glow", "d-none")
+                pane.classList.remove("active", "placeholder-glow", "d-none")
 
 
                 let title = tab.querySelector("#tab__title--placeholder")
@@ -547,8 +580,6 @@
                 tabs.push(tab.firstChild)
                 panes.push(pane.firstChild)
             }
-            PLACEHOLDER_TAB.classList.add("d-none")
-            PLACEHOLDER_PANE.classList.add("d-none")
             for (let i = 0; i < tabs.length; i++) {
                 TAB_CONTAINER.appendChild(tabs[i])
                 PANE_CONTAINER.appendChild(panes[i])
@@ -568,7 +599,8 @@
             });
         })
         .catch((error) => {
-            console.error(error)
+            PLACEHOLDER_TAB.classList.add("d-none")
+            PLACEHOLDER_PANE.classList.add("d-none")
         });
     }
 

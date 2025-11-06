@@ -175,25 +175,40 @@ type ServiceScoreData struct {
 	TotalPenalty int
 }
 
-func GetServiceScores() ([]ServiceScoreData, error) {
+func GetServiceScores(teamid uint) ([]ServiceScoreData, error) {
 	var results []ServiceScoreData
 
-	err := db.Model(&ServiceCheckSchema{}).
-		Select(`
-			service_check_schemas.team_id,
-			service_check_schemas.service_name,
-			SUM(CASE WHEN service_check_schemas.result = ? THEN service_check_schemas.points ELSE 0 END) as points,
-			COUNT(sla_schemas.round_id) as violations,
-			COALESCE(SUM(sla_schemas.penalty), 0) as total_penalty
-		`, true).
-		Joins("LEFT JOIN sla_schemas ON service_check_schemas.team_id = sla_schemas.team_id AND service_check_schemas.service_name = sla_schemas.service_name").
-		Group("service_check_schemas.team_id, service_check_schemas.service_name").
-		Find(&results).Error
-
+	// Get all unique service points for the team
+	rows, err := db.Model(ServiceCheckSchema{}).Select("DISTINCT service_name").Where("team_id = ?", teamid).Rows()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
+	for rows.Next() {
+		var serviceName string
+		if err := rows.Scan(&serviceName); err != nil {
+			return nil, err
+		}
+		result := ServiceScoreData{
+			TeamID:      teamid,
+			ServiceName: serviceName,
+		}
+
+		// query points and violations for each service
+		row := db.Model(ServiceCheckSchema{}).Select("SUM(CASE WHEN result = true THEN points ELSE 0 END) as points").
+			Where("team_id = ? AND service_name = ?", teamid, serviceName).Row()
+		if err := row.Scan(&result.Points); err != nil {
+			return nil, err
+		}
+
+		row = db.Model(SLASchema{}).Select("COUNT(*) as violations, COALESCE(SUM(penalty), 0) as total_penalty").
+			Where("team_id = ? AND service_name = ?", teamid, serviceName).Row()
+		if err := row.Scan(&result.Violations, &result.TotalPenalty); err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
 	return results, nil
 }
 

@@ -73,31 +73,31 @@ func ExportScores(w http.ResponseWriter, r *http.Request) {
 
 	teamScores := make(map[uint]*TeamScore)
 	for _, team := range teams {
-		teamScores[team.ID] = &TeamScore{
+		ts := &TeamScore{
 			TeamID:   team.ID,
 			TeamName: team.Name,
 			Services: []ServiceScore{},
 		}
-	}
+		serviceData, err := db.GetServiceScores(team.ID)
+		if err != nil {
+                        slog.Error("error getting service export", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	serviceData, err := db.GetServiceScores()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	for _, sd := range serviceData {
-		if team, ok := teamScores[sd.TeamID]; ok {
+		for _, sd := range serviceData {
 			service := ServiceScore{
 				ServiceName:   sd.ServiceName,
 				Points:        sd.Points,
 				SlaViolations: sd.Violations,
 				SlaPenalty:    sd.TotalPenalty,
 			}
-			team.Services = append(team.Services, service)
-			team.TotalPoints += sd.Points - sd.TotalPenalty
+			ts.Services = append(ts.Services, service)
+			ts.TotalPoints += sd.Points - sd.TotalPenalty
 		}
+                teamScores[team.ID] = ts
 	}
+
 
 	var data []TeamScore
 	for _, score := range teamScores {

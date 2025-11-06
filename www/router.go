@@ -44,7 +44,7 @@ func (router *Router) Start() {
 
 	mux.Handle("/static/assets/", http.StripPrefix("/static/assets/", http.FileServer(http.Dir("./static/assets"))))
 
-	UNAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Cors, middleware.Authentication("anonymous", "team", "admin", "red"))
+	UNAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Cors, middleware.Authentication("anonymous", "team", "admin", "red", "inject"))
 	// public API routes
 	mux.HandleFunc("POST /api/login", api.Login)
 
@@ -86,7 +86,7 @@ func (router *Router) Start() {
 	|                                         |
 	******************************************/
 
-	TEAMAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Authentication("team", "admin"))
+	TEAMAUTH := middleware.MiddlewareChain(middleware.Logging, middleware.Authentication("team", "admin", "inject"))
 	// team auth API routes
 	mux.HandleFunc("GET /api/teams", TEAMAUTH(api.GetTeams))
 	mux.HandleFunc("GET /api/services/{team_id}", TEAMAUTH(api.GetTeamSummary))
