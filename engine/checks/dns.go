@@ -32,12 +32,25 @@ func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		var msg dns.Msg
 
 		// switch of kind of record (A, MX, etc)
-		// TODO: add more values
 		switch record.Kind {
 		case "A":
 			msg.SetQuestion(fqdn, dns.TypeA)
+		case "AAAA":
+			msg.SetQuestion(fqdn, dns.TypeAAAA)
+		case "CNAME":
+			msg.SetQuestion(fqdn, dns.TypeCNAME)
 		case "MX":
 			msg.SetQuestion(fqdn, dns.TypeMX)
+		case "NS":
+			msg.SetQuestion(fqdn, dns.TypeNS)
+		case "PTR":
+			msg.SetQuestion(fqdn, dns.TypePTR)
+		case "SOA":
+			msg.SetQuestion(fqdn, dns.TypeSOA)
+		case "SRV":
+			msg.SetQuestion(fqdn, dns.TypeSRV)
+		case "TXT":
+			msg.SetQuestion(fqdn, dns.TypeTXT)
 		}
 
 		// Make it obey timeout via deadline
@@ -75,10 +88,51 @@ func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 
 		// Loop through results and check for correct match
 		for _, answer := range in.Answer {
-			// Check if an answer is an A record and it matches the expected IP
+			// Check the answer based on record type
 			for _, expectedAnswer := range record.Answer {
 				expectedAnswer = strings.ReplaceAll(expectedAnswer, "_", teamIdentifier)
-				if a, ok := answer.(*dns.A); ok && (a.A).String() == expectedAnswer {
+				var actualAnswer string
+
+				switch record.Kind {
+				case "A":
+					if a, ok := answer.(*dns.A); ok {
+						actualAnswer = a.A.String()
+					}
+				case "AAAA":
+					if aaaa, ok := answer.(*dns.AAAA); ok {
+						actualAnswer = aaaa.AAAA.String()
+					}
+				case "CNAME":
+					if cname, ok := answer.(*dns.CNAME); ok {
+						actualAnswer = cname.Target
+					}
+				case "MX":
+					if mx, ok := answer.(*dns.MX); ok {
+						actualAnswer = mx.Mx
+					}
+				case "NS":
+					if ns, ok := answer.(*dns.NS); ok {
+						actualAnswer = ns.Ns
+					}
+				case "PTR":
+					if ptr, ok := answer.(*dns.PTR); ok {
+						actualAnswer = ptr.Ptr
+					}
+				case "SOA":
+					if soa, ok := answer.(*dns.SOA); ok {
+						actualAnswer = soa.Ns
+					}
+				case "SRV":
+					if srv, ok := answer.(*dns.SRV); ok {
+						actualAnswer = srv.Target
+					}
+				case "TXT":
+					if txt, ok := answer.(*dns.TXT); ok {
+						actualAnswer = strings.Join(txt.Txt, " ")
+					}
+				}
+
+				if actualAnswer == expectedAnswer {
 					checkResult.Status = true
 					checkResult.Debug = fmt.Sprintf("record %s returned %s. acceptable answers were: %v", record.Domain, expectedAnswer, record.Answer)
 					response <- checkResult
