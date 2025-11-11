@@ -379,6 +379,13 @@ func (se *ScoringEngine) rvb() error {
 		slog.Debug("Box configuration", "name", box.Name, "runners", len(box.Runners))
 	}
 
+	// Clear any stale tasks from previous rounds before enqueuing new ones
+	staleTasks := se.RedisClient.LLen(ctx, "tasks").Val()
+	if staleTasks > 0 {
+		slog.Warn("Clearing stale tasks from queue", "count", staleTasks, "round", se.CurrentRound)
+		se.RedisClient.Del(ctx, "tasks")
+	}
+
 	// 1) Enqueue
 	for _, team := range teams {
 		if !team.Active {
@@ -431,6 +438,7 @@ func (se *ScoringEngine) rvb() error {
 	defer cancel()
 
 	i := 0
+COLLECTION:
 	for i < runners {
 		select {
 		case msg := <-eventsChannel:
@@ -444,17 +452,15 @@ func (se *ScoringEngine) rvb() error {
 		default:
 			val, err := se.RedisClient.BLPop(timeoutCtx, time.Until(se.NextRoundStartTime), "results").Result()
 			if err == redis.Nil {
-				slog.Warn("Timeout waiting for results", "remaining", runners-i)
-				// Clear the results, since we didn't collect everything in time
+				slog.Warn("Timeout waiting for results", "remaining", runners-i, "collected", i, "expected", runners)
 				results = []checks.Result{}
-				break
+				break COLLECTION
 			} else if err != nil {
 				// Check if the timeout context has expired
 				if timeoutCtx.Err() != nil {
-					slog.Warn("Round deadline exceeded while waiting for results", "remaining", runners-i, "error", err)
-					// Clear the results, since we didn't collect everything in time
+					slog.Warn("Round deadline exceeded while waiting for results", "remaining", runners-i, "collected", i, "expected", runners, "error", err)
 					results = []checks.Result{}
-					break
+					break COLLECTION
 				}
 				slog.Error("Failed to fetch results from Redis:", "error", err)
 				time.Sleep(2 * time.Second)
