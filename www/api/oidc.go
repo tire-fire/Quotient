@@ -114,6 +114,12 @@ func OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if oauth2Config == nil {
+		slog.Error("OIDC not properly initialized - oauth2Config is nil")
+		http.Error(w, "OIDC authentication is temporarily unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
 	// Generate CSRF state
 	state, err := generateRandomString(32)
 	if err != nil {
@@ -187,6 +193,12 @@ func OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !conf.OIDCSettings.OIDCEnabled {
 		http.Error(w, "OIDC authentication is not enabled", http.StatusNotFound)
+		return
+	}
+
+	if oauth2Config == nil || oidcVerifier == nil {
+		slog.Error("OIDC not properly initialized - oauth2Config or verifier is nil")
+		http.Error(w, "OIDC authentication is temporarily unavailable", http.StatusServiceUnavailable)
 		return
 	}
 
