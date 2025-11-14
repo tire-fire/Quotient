@@ -80,7 +80,7 @@ func ExportScores(w http.ResponseWriter, r *http.Request) {
 		}
 		serviceData, err := db.GetServiceScores(team.ID)
 		if err != nil {
-                        slog.Error("error getting service export", "error", err)
+			slog.Error("error getting service export", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -95,9 +95,8 @@ func ExportScores(w http.ResponseWriter, r *http.Request) {
 			ts.Services = append(ts.Services, service)
 			ts.TotalPoints += sd.Points - sd.TotalPenalty
 		}
-                teamScores[team.ID] = ts
+		teamScores[team.ID] = ts
 	}
-
 
 	var data []TeamScore
 	for _, score := range teamScores {
