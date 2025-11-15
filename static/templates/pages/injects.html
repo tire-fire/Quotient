@@ -470,8 +470,8 @@
             if (prevData === undefined) {
                 prevData = data
             } else if (JSON.stringify(prevData) != JSON.stringify(data)) {
+                prevData = data
                 REFRESH_BTN.classList.remove("d-none")
-                return
             }
             let tabs = [];
             let panes = [];
