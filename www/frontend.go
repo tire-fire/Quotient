@@ -158,6 +158,12 @@ func (router *Router) AdministrateAppearancePage(w http.ResponseWriter, r *http.
 }
 
 func (router *Router) GraphPage(w http.ResponseWriter, r *http.Request) {
+	var roles []string
+	if r.Context().Value("roles") != nil {
+		roles = r.Context().Value("roles").([]string)
+	}
+	_ = roles // roles will be used when competition start feature is added
+
 	page := template.Must(template.Must(base.Clone()).ParseFiles("./static/templates/layouts/page.html", "./static/templates/pages/graphs.html"))
 	if err := page.ExecuteTemplate(w, "base", router.pageData(r, map[string]any{"title": "Graphs"})); err != nil {
 		panic(err)
