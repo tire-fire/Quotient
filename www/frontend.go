@@ -1,11 +1,11 @@
 package www
 
 import (
+	"html/template"
 	"maps"
 	"net/http"
 	"quotient/www/api"
 	"slices"
-	"text/template"
 )
 
 var (
