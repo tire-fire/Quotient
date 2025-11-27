@@ -1,0 +1,15 @@
+# 2025/11/23 07:47:24.641232 [TestPropertyConfigPortDefaults] [rapid] draw hasSSL: false
+# 2025/11/23 07:47:24.641275 [TestPropertyConfigPortDefaults] 
+# 	Error Trace:	/home/user/Quotient/engine/config/config_properties_test.go:161
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/home/user/Quotient/engine/config/config_properties_test.go:127
+# 	            				/usr/local/go1.24.7/src/runtime/asm_amd64.s:1700
+# 	Error:      	Received unexpected error:
+# 	            	not a valid event type
+# 	Test:       	TestPropertyConfigPortDefaults
+# 
+v0.4.8#1237857130106561787
+0x0

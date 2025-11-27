@@ -1,0 +1,25 @@
+# 2025/11/23 07:47:49.210802 [TestPropertyConfigCredlistPathNormalization] [rapid] draw path: "simple.csv"
+# 2025/11/23 07:47:49.210834 [TestPropertyConfigCredlistPathNormalization] 
+# 	Error Trace:	/home/user/Quotient/engine/config/config_properties_test.go:208
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/home/user/Quotient/engine/config/config_properties_test.go:170
+# 	            				/usr/local/go1.24.7/src/runtime/asm_amd64.s:1700
+# 	Error:      	Not equal: 
+# 	            	expected: "creds.csv"
+# 	            	actual  : "simple.csv"
+# 	            	
+# 	            	Diff:
+# 	            	--- Expected
+# 	            	+++ Actual
+# 	            	@@ -1 +1 @@
+# 	            	-creds.csv
+# 	            	+simple.csv
+# 	Test:       	TestPropertyConfigCredlistPathNormalization
+# 	Messages:   	path should be normalized to basename
+# 
+v0.4.8#4153117091799293646
+0x1cbbf63c066f1f
+0x3

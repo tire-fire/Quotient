@@ -1,0 +1,16 @@
+# 2025/11/23 07:47:24.642967 [TestPropertyConfigCredlistPathNormalization] [rapid] draw path: "./local/creds.csv"
+# 2025/11/23 07:47:24.643008 [TestPropertyConfigCredlistPathNormalization] 
+# 	Error Trace:	/home/user/Quotient/engine/config/config_properties_test.go:202
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/home/user/Quotient/engine/config/config_properties_test.go:170
+# 	            				/usr/local/go1.24.7/src/runtime/asm_amd64.s:1700
+# 	Error:      	Received unexpected error:
+# 	            	not a valid event type
+# 	Test:       	TestPropertyConfigCredlistPathNormalization
+# 
+v0.4.8#17171633079161262496
+0x3f83ae0ef561
+0x1

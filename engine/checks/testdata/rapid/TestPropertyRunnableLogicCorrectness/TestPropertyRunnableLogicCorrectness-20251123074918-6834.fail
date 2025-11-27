@@ -1,0 +1,27 @@
+# 2025/11/23 07:49:18.206112 [TestPropertyRunnableLogicCorrectness] [rapid] draw disabled: false
+# 2025/11/23 07:49:18.206126 [TestPropertyRunnableLogicCorrectness] [rapid] draw launchOffset: -1
+# 2025/11/23 07:49:18.206128 [TestPropertyRunnableLogicCorrectness] [rapid] draw hasStopTime: true
+# 2025/11/23 07:49:18.206129 [TestPropertyRunnableLogicCorrectness] [rapid] draw stopOffset: 0
+# 2025/11/23 07:49:18.206212 [TestPropertyRunnableLogicCorrectness] 
+# 	Error Trace:	/home/user/Quotient/engine/checks/checks_properties_test.go:283
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/home/user/Quotient/engine/checks/checks_properties_test.go:251
+# 	            				/usr/local/go1.24.7/src/runtime/asm_amd64.s:1700
+# 	Error:      	Not equal: 
+# 	            	expected: true
+# 	            	actual  : false
+# 	Test:       	TestPropertyRunnableLogicCorrectness
+# 	Messages:   	runnable result should match expected state machine logic
+# 
+v0.4.8#14112145116233763634
+0x0
+0x11240e77682124
+0x22b33fca605f7
+0x0
+0x1
+0xb3338594c088a
+0x85cd2a2fe11a
+0x0

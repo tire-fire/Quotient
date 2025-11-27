@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -174,9 +175,34 @@ func (conf *ConfigSettings) SetConfig(path string) error {
 	slog.Info("Loading configuration file", "path", path)
 
 	tempConf := ConfigSettings{}
-	fileContent, err := os.ReadFile(path)
+
+	// Use os.Root for safe file access
+	dir := filepath.Dir(path)
+	filename := filepath.Base(path)
+
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return fmt.Errorf("configuration file ("+path+") not found:", err)
+		return fmt.Errorf("failed to open config directory: %w", err)
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			slog.Error("failed to close config root directory", "error", err)
+		}
+	}()
+
+	file, err := root.Open(filename)
+	if err != nil {
+		return fmt.Errorf("configuration file ("+path+") not found: %w", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Error("failed to close config file", "error", err)
+		}
+	}()
+
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read configuration file: %w", err)
 	}
 
 	slog.Debug("Decoding TOML configuration")

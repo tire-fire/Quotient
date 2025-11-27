@@ -96,9 +96,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	// check credentials
 	auth, err := auth(form.Username, form.Password)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		d, _ := json.Marshal(map[string]any{"error": "Incorrect username/password"})
-		w.Write(d)
+		WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "Incorrect username/password"})
 		slog.Info("Failed logon", "username", form.Username)
 		return
 	}
@@ -116,6 +114,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int((time.Hour * 24).Seconds()),
 		HttpOnly: true,
 		Secure:   cookieSecure(),
+		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	})
 
@@ -129,6 +128,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   0,
 		HttpOnly: true,
 		Secure:   cookieSecure(),
+		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	})
 	slog.Info("Successful logout", "username", r.Context().Value("username"))
@@ -174,6 +174,7 @@ func Authenticate(w http.ResponseWriter, r *http.Request) (string, []string) {
 		MaxAge:   int((time.Hour * 24).Seconds()),
 		HttpOnly: true,
 		Secure:   cookieSecure(),
+		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	})
 

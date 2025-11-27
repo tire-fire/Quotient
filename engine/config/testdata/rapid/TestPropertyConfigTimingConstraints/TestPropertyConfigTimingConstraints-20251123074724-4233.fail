@@ -1,0 +1,26 @@
+# 2025/11/23 07:47:24.637962 [TestPropertyConfigTimingConstraints] [rapid] draw delay: 41
+# 2025/11/23 07:47:24.637972 [TestPropertyConfigTimingConstraints] [rapid] draw jitter: 17
+# 2025/11/23 07:47:24.637976 [TestPropertyConfigTimingConstraints] [rapid] draw timeout: 13
+# 2025/11/23 07:47:24.638013 [TestPropertyConfigTimingConstraints] 
+# 	Error Trace:	/home/user/Quotient/engine/config/config_properties_test.go:37
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:371
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:380
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:205
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.2.0/engine.go:120
+# 	            				/home/user/Quotient/engine/config/config_properties_test.go:13
+# 	            				/usr/local/go1.24.7/src/runtime/asm_amd64.s:1700
+# 	Error:      	Received unexpected error:
+# 	            	not a valid event type
+# 	Test:       	TestPropertyConfigTimingConstraints
+# 	Messages:   	valid config should pass validation
+# 
+v0.4.8#289768811760912889
+0x1664ec5899cbcf
+0xc0f4f94534c69
+0x1f
+0x4722a999477ff
+0x18d3ff853ee20d
+0x10
+0xd633cfd1effd1
+0x1ca61736b5a4b0
+0xc
