@@ -8,10 +8,44 @@ import (
 	"math/rand"
 	"net"
 	"net/smtp"
-	"os"
 	"strings"
 	"time"
 )
+
+// safeFortunes contains a curated list of appropriate fortunes for email content.
+// These replace the system fortune database which contains inappropriate material.
+var safeFortunes = []string{
+	"The best way to predict the future is to invent it. - Alan Kay",
+	"Simplicity is the ultimate sophistication. - Leonardo da Vinci",
+	"First, solve the problem. Then, write the code. - John Johnson",
+	"Code is like humor. When you have to explain it, it's bad. - Cory House",
+	"Make it work, make it right, make it fast. - Kent Beck",
+	"The only way to do great work is to love what you do. - Steve Jobs",
+	"Talk is cheap. Show me the code. - Linus Torvalds",
+	"Programs must be written for people to read. - Harold Abelson",
+	"Any fool can write code that a computer can understand. Good programmers write code that humans can understand. - Martin Fowler",
+	"The best error message is the one that never shows up. - Thomas Fuchs",
+	"Debugging is twice as hard as writing the code in the first place. - Brian Kernighan",
+	"Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away. - Antoine de Saint-Exupery",
+	"Java is to JavaScript what car is to carpet. - Chris Heilmann",
+	"Knowledge is power. - Francis Bacon",
+	"In theory, theory and practice are the same. In practice, they are not. - Albert Einstein",
+	"The computer was born to solve problems that did not exist before. - Bill Gates",
+	"A good programmer looks both ways before crossing a one-way street.",
+	"Weeks of coding can save you hours of planning.",
+	"It works on my machine.",
+	"There are only two hard things in computer science: cache invalidation and naming things. - Phil Karlton",
+	"The best thing about a boolean is even if you are wrong, you are only off by a bit.",
+	"A user interface is like a joke. If you have to explain it, it's not that good.",
+	"Computers are fast; programmers keep them slow.",
+	"Copy and paste is a design error. - David Parnas",
+	"Deleted code is debugged code. - Jeff Sickel",
+	"If debugging is the process of removing bugs, then programming must be the process of putting them in. - Edsger Dijkstra",
+	"The most disastrous thing that you can ever learn is your first programming language. - Alan Kay",
+	"One man's crappy software is another man's full-time job. - Jessica Gaston",
+	"Always code as if the guy who ends up maintaining your code will be a violent psychopath who knows where you live. - John Woods",
+	"Programming is the art of telling another human being what one wants the computer to do. - Donald Knuth",
+}
 
 type Smtp struct {
 	Service
@@ -34,20 +68,7 @@ func (a unencryptedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) 
 
 func (c Smtp) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
-		fortunes, err := os.ReadFile("/usr/share/fortune/fortunes")
-		if err != nil {
-			checkResult.Error = "failed to load fortune file (/usr/share/fortune/fortunes)"
-			checkResult.Debug = err.Error()
-			response <- checkResult
-			return
-		}
-		c.Fortunes = strings.Split(string(fortunes), "\n%\n")
-		if len(c.Fortunes) == 0 {
-			checkResult.Error = "failed to load fortune file (/usr/share/fortune/fortunes)"
-			checkResult.Debug = "no fortunes found"
-			response <- checkResult
-			return
-		}
+		c.Fortunes = safeFortunes
 
 		// Create a dialer
 		dialer := net.Dialer{
