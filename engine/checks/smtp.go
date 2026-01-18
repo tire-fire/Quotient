@@ -3,48 +3,30 @@ package checks
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"math/rand"
 	"net"
 	"net/smtp"
-	"strings"
 	"time"
 )
 
-// safeFortunes contains a curated list of appropriate fortunes for email content.
-// These replace the system fortune database which contains inappropriate material.
-var safeFortunes = []string{
-	"The best way to predict the future is to invent it. - Alan Kay",
-	"Simplicity is the ultimate sophistication. - Leonardo da Vinci",
-	"First, solve the problem. Then, write the code. - John Johnson",
-	"Code is like humor. When you have to explain it, it's bad. - Cory House",
-	"Make it work, make it right, make it fast. - Kent Beck",
-	"The only way to do great work is to love what you do. - Steve Jobs",
-	"Talk is cheap. Show me the code. - Linus Torvalds",
-	"Programs must be written for people to read. - Harold Abelson",
-	"Any fool can write code that a computer can understand. Good programmers write code that humans can understand. - Martin Fowler",
-	"The best error message is the one that never shows up. - Thomas Fuchs",
-	"Debugging is twice as hard as writing the code in the first place. - Brian Kernighan",
-	"Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away. - Antoine de Saint-Exupery",
-	"Java is to JavaScript what car is to carpet. - Chris Heilmann",
-	"Knowledge is power. - Francis Bacon",
-	"In theory, theory and practice are the same. In practice, they are not. - Albert Einstein",
-	"The computer was born to solve problems that did not exist before. - Bill Gates",
-	"A good programmer looks both ways before crossing a one-way street.",
-	"Weeks of coding can save you hours of planning.",
-	"It works on my machine.",
-	"There are only two hard things in computer science: cache invalidation and naming things. - Phil Karlton",
-	"The best thing about a boolean is even if you are wrong, you are only off by a bit.",
-	"A user interface is like a joke. If you have to explain it, it's not that good.",
-	"Computers are fast; programmers keep them slow.",
-	"Copy and paste is a design error. - David Parnas",
-	"Deleted code is debugged code. - Jeff Sickel",
-	"If debugging is the process of removing bugs, then programming must be the process of putting them in. - Edsger Dijkstra",
-	"The most disastrous thing that you can ever learn is your first programming language. - Alan Kay",
-	"One man's crappy software is another man's full-time job. - Jessica Gaston",
-	"Always code as if the guy who ends up maintaining your code will be a violent psychopath who knows where you live. - John Woods",
-	"Programming is the art of telling another human being what one wants the computer to do. - Donald Knuth",
+// generateRandomContent creates unpredictable email content to prevent
+// SMTP check bypass by accepting only known static messages.
+func generateRandomContent() (subject string, body string) {
+	// Generate random bytes for subject and body
+	subjectBytes := make([]byte, 8)
+	bodyBytes := make([]byte, 32)
+
+	// #nosec G404 -- non-crypto random for email content noise
+	rand.Read(subjectBytes)
+	// #nosec G404 -- non-crypto random for email content noise
+	rand.Read(bodyBytes)
+
+	subject = hex.EncodeToString(subjectBytes)
+	body = hex.EncodeToString(bodyBytes)
+	return
 }
 
 type Smtp struct {
@@ -52,7 +34,6 @@ type Smtp struct {
 	Encrypted   bool
 	Domain      string
 	RequireAuth bool
-	Fortunes    []string
 }
 
 type unencryptedAuth struct {
@@ -68,25 +49,13 @@ func (a unencryptedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) 
 
 func (c Smtp) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
-		c.Fortunes = safeFortunes
-
 		// Create a dialer
 		dialer := net.Dialer{
 			Timeout: time.Duration(c.Timeout) * time.Second,
 		}
 
-		fortune := c.Fortunes[rand.Intn(len(c.Fortunes))] // #nosec G404 -- non-crypto selection of fortune text
-		words := strings.Fields(fortune)
-		subject := ""
-		if len(words) <= 3 {
-			subject = fortune
-		} else {
-			selected := make([]string, 3)
-			for i := range 3 {
-				selected[i] = words[rand.Intn(len(words))] // #nosec G404 -- non-crypto selection of words for subject
-			}
-			subject = strings.Join(selected, " ")
-		}
+		// Generate random content to prevent bypass via static message acceptance
+		subject, body := generateRandomContent()
 
 		// ***********************************************
 		// Set up custom auth for bypassing net/smtp protections
@@ -197,20 +166,20 @@ func (c Smtp) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan 
 			}
 		}()
 
-		body := fmt.Sprintf("Subject: %s\n\n%s\n\n", subject, fortune)
+		message := fmt.Sprintf("Subject: %s\n\n%s\n\n", subject, body)
 
-		// Write the body using Fprint to avoid treating the contents as a
+		// Write the message using Fprint to avoid treating the contents as a
 		// format string.
-		_, err = fmt.Fprint(wc, body)
+		_, err = fmt.Fprint(wc, message)
 		if err != nil {
-			checkResult.Error = "writing body failed"
+			checkResult.Error = "writing message failed"
 			checkResult.Debug = err.Error()
 			response <- checkResult
 			return
 		}
 
 		checkResult.Status = true
-		checkResult.Debug = "successfully wrote '" + body + "' to " + toUser + " from " + username
+		checkResult.Debug = "successfully wrote '" + message + "' to " + toUser + " from " + username
 		response <- checkResult
 	}
 
