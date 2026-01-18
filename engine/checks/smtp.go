@@ -2,11 +2,11 @@ package checks
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"net"
 	"net/smtp"
 	"time"
@@ -15,13 +15,10 @@ import (
 // generateRandomContent creates unpredictable email content to prevent
 // SMTP check bypass by accepting only known static messages.
 func generateRandomContent() (subject string, body string) {
-	// Generate random bytes for subject and body
 	subjectBytes := make([]byte, 8)
 	bodyBytes := make([]byte, 32)
 
-	// #nosec G404 -- non-crypto random for email content noise
 	rand.Read(subjectBytes)
-	// #nosec G404 -- non-crypto random for email content noise
 	rand.Read(bodyBytes)
 
 	subject = hex.EncodeToString(subjectBytes)
