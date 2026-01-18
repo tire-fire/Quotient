@@ -18,8 +18,10 @@ func generateRandomContent() (subject string, body string) {
 	subjectBytes := make([]byte, 8)
 	bodyBytes := make([]byte, 32)
 
-	rand.Read(subjectBytes)
-	rand.Read(bodyBytes)
+	// crypto/rand.Read is documented to always return len(b), nil
+	// and will panic if the system has no randomness source
+	_, _ = rand.Read(subjectBytes)
+	_, _ = rand.Read(bodyBytes)
 
 	subject = hex.EncodeToString(subjectBytes)
 	body = hex.EncodeToString(bodyBytes)
