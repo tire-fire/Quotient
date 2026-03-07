@@ -55,3 +55,12 @@ func RefreshScoresMaterializedView() error {
 	// Use concurrent refresh to avoid blocking reads
 	return db.Exec("REFRESH MATERIALIZED VIEW CONCURRENTLY cumulative_scores").Error
 }
+
+func GetAllRoundsWithChecks() ([]RoundSchema, error) {
+	var rounds []RoundSchema
+	result := db.Table("round_schemas").Preload("Checks").Order("id asc").Find(&rounds)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return rounds, nil
+}
