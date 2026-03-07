@@ -194,7 +194,7 @@ func (conf *ConfigSettings) SetConfig(path string) error {
 	slog.Debug("Configuration state", "boxes", len(tempConf.Box))
 
 	// check the configuration and set defaults
-	if err := checkConfig(&tempConf); err != nil {
+	if err := validateAndApplyDefaults(&tempConf); err != nil {
 		return fmt.Errorf("configuration file ("+path+") is invalid:", err)
 	}
 
@@ -208,8 +208,10 @@ func (conf *ConfigSettings) SetConfig(path string) error {
 	return nil
 }
 
-// general error checking
-func checkConfig(conf *ConfigSettings) error {
+// validateAndApplyDefaults validates configuration settings and applies
+// default values for optional fields. It mutates conf in place.
+// Returns a joined error of all validation failures.
+func validateAndApplyDefaults(conf *ConfigSettings) error {
 	var errResult error
 
 	// required settings
@@ -276,21 +278,21 @@ func checkConfig(conf *ConfigSettings) error {
 			errResult = errors.Join(errResult, fmt.Errorf("credlist %d missing path", i))
 		}
 		if credlist.CredlistName == "" {
-			conf.CredlistSettings.Credlist[i].CredlistName = credlist.CredlistPath
+			conf.CredlistSettings.Credlist[i].CredlistName = credlist.CredlistPath // Default: use path as name
 		}
 		if credlist.CredlistExplainText == "" {
-			conf.CredlistSettings.Credlist[i].CredlistExplainText = "username,password"
+			conf.CredlistSettings.Credlist[i].CredlistExplainText = "username,password" // Default: "username,password"
 		}
 
 		conf.CredlistSettings.Credlist[i].CredlistPath = filepath.Base(credlist.CredlistPath)
 	}
 
 	if conf.MiscSettings.Delay == 0 {
-		conf.MiscSettings.Delay = 60
+		conf.MiscSettings.Delay = 60 // Default: 60 seconds between rounds
 	}
 
 	if conf.MiscSettings.Jitter == 0 {
-		conf.MiscSettings.Jitter = 5
+		conf.MiscSettings.Jitter = 5 // Default: 5 seconds of jitter
 	}
 
 	if conf.SslSettings != (SslConfig{}) {
@@ -300,14 +302,14 @@ func checkConfig(conf *ConfigSettings) error {
 	}
 
 	if conf.MiscSettings.LogoImage == "" {
-		conf.MiscSettings.LogoImage = "/static/assets/quotient.svg"
+		conf.MiscSettings.LogoImage = "/static/assets/quotient.svg" // Default: Quotient logo
 	}
 
 	if conf.MiscSettings.Port == 0 {
 		if conf.SslSettings != (SslConfig{}) {
-			conf.MiscSettings.Port = 443
+			conf.MiscSettings.Port = 443 // Default: 443 when SSL is configured
 		} else {
-			conf.MiscSettings.Port = 80
+			conf.MiscSettings.Port = 80 // Default: 80 when no SSL
 		}
 	}
 
@@ -317,22 +319,22 @@ func checkConfig(conf *ConfigSettings) error {
 	}
 
 	if conf.MiscSettings.Timeout == 0 {
-		conf.MiscSettings.Timeout = conf.MiscSettings.Delay / 2
+		conf.MiscSettings.Timeout = conf.MiscSettings.Delay / 2 // Default: half of delay
 	}
 	if conf.MiscSettings.Timeout >= conf.MiscSettings.Delay-conf.MiscSettings.Jitter {
 		errResult = errors.Join(errResult, errors.New("timeout must be smaller than delay minus jitter"))
 	}
 
 	if conf.MiscSettings.Points == 0 {
-		conf.MiscSettings.Points = 1
+		conf.MiscSettings.Points = 1 // Default: 1 point per check
 	}
 
 	if conf.MiscSettings.SlaThreshold == 0 {
-		conf.MiscSettings.SlaThreshold = 5
+		conf.MiscSettings.SlaThreshold = 5 // Default: 5 consecutive failures for SLA
 	}
 
 	if conf.MiscSettings.SlaPenalty == 0 {
-		conf.MiscSettings.SlaPenalty = conf.MiscSettings.SlaThreshold * conf.MiscSettings.Points
+		conf.MiscSettings.SlaPenalty = conf.MiscSettings.SlaThreshold * conf.MiscSettings.Points // Default: threshold * points
 	}
 
 	// OIDC settings defaults
@@ -352,22 +354,22 @@ func checkConfig(conf *ConfigSettings) error {
 
 		// Set defaults
 		if len(conf.OIDCSettings.OIDCScopes) == 0 {
-			conf.OIDCSettings.OIDCScopes = []string{"openid", "profile", "email", "groups", "offline_access"}
+			conf.OIDCSettings.OIDCScopes = []string{"openid", "profile", "email", "groups", "offline_access"} // Default: standard OIDC scopes
 		}
 		if conf.OIDCSettings.OIDCGroupClaim == "" {
-			conf.OIDCSettings.OIDCGroupClaim = "groups"
+			conf.OIDCSettings.OIDCGroupClaim = "groups" // Default: "groups" claim
 		}
 		if conf.OIDCSettings.OIDCRefreshTokenExpiryTeam == 0 {
-			conf.OIDCSettings.OIDCRefreshTokenExpiryTeam = 86400 // 1 day
+			conf.OIDCSettings.OIDCRefreshTokenExpiryTeam = 86400 // Default: 1 day
 		}
 		if conf.OIDCSettings.OIDCRefreshTokenExpiryAdmin == 0 {
-			conf.OIDCSettings.OIDCRefreshTokenExpiryAdmin = 2592000 // 30 days
+			conf.OIDCSettings.OIDCRefreshTokenExpiryAdmin = 2592000 // Default: 30 days
 		}
 		if conf.OIDCSettings.OIDCRefreshTokenExpiryRed == 0 {
-			conf.OIDCSettings.OIDCRefreshTokenExpiryRed = 172800 // 2 days
+			conf.OIDCSettings.OIDCRefreshTokenExpiryRed = 172800 // Default: 2 days
 		}
 		if conf.OIDCSettings.OIDCRefreshTokenExpiryInject == 0 {
-			conf.OIDCSettings.OIDCRefreshTokenExpiryInject = 86400 // 1 day
+			conf.OIDCSettings.OIDCRefreshTokenExpiryInject = 86400 // Default: 1 day
 		}
 	}
 

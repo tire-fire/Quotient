@@ -31,7 +31,7 @@ func TestPropertyConfigTimingConstraints(t *testing.T) {
 		}
 
 		// CALL REAL ENGINE CODE
-		err := checkConfig(conf)
+		err := validateAndApplyDefaults(conf)
 
 		// Property: Valid config should pass validation
 		assert.NoError(t, err, "valid config should pass validation")
@@ -47,7 +47,7 @@ func TestPropertyConfigTimingConstraints(t *testing.T) {
 
 		// Property 3: SLA penalty defaults correctly (line 303)
 		if conf.MiscSettings.SlaPenalty == 0 {
-			// If not set, checkConfig sets default
+			// If not set, validateAndApplyDefaults sets default
 			expectedPenalty := conf.MiscSettings.SlaThreshold * conf.MiscSettings.Points
 			assert.Equal(t, expectedPenalty, conf.MiscSettings.SlaPenalty,
 				"SLA penalty should default to threshold * points")
@@ -82,7 +82,7 @@ func TestPropertyConfigRejectsInvalidJitter(t *testing.T) {
 			},
 		}
 
-		err := checkConfig(conf)
+		err := validateAndApplyDefaults(conf)
 
 		// Property: Invalid jitter MUST be rejected (line 283-285)
 		require.Error(t, err, "jitter >= delay should fail validation")
@@ -113,7 +113,7 @@ func TestPropertyConfigRejectsInvalidTimeout(t *testing.T) {
 			},
 		}
 
-		err := checkConfig(conf)
+		err := validateAndApplyDefaults(conf)
 
 		// Property: Invalid timeout MUST be rejected (line 290-292)
 		require.Error(t, err, "timeout >= delay-jitter should fail validation")
@@ -137,7 +137,7 @@ func TestPropertyConfigPortDefaults(t *testing.T) {
 			MiscSettings: MiscConfig{
 				Delay:  60,
 				Jitter: 5,
-				// Port intentionally 0 (should be set by checkConfig)
+				// Port intentionally 0 (should be set by validateAndApplyDefaults)
 			},
 		}
 
@@ -149,7 +149,7 @@ func TestPropertyConfigPortDefaults(t *testing.T) {
 			}
 		}
 
-		err := checkConfig(conf)
+		err := validateAndApplyDefaults(conf)
 
 		if hasSSL {
 			// With SSL, should default to port 443 (line 275-277)
@@ -196,7 +196,7 @@ func TestPropertyConfigCredlistPathNormalization(t *testing.T) {
 			},
 		}
 
-		err := checkConfig(conf)
+		err := validateAndApplyDefaults(conf)
 		assert.NoError(t, err)
 
 		// Property: All credlist paths should be normalized to basename (line 253)
