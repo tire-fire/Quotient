@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"quotient/engine/config"
+	"quotient/internal/ldaputil"
 
-	"github.com/go-ldap/ldap/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -106,31 +106,21 @@ func AddTeams(conf *config.ConfigSettings) error {
 	// check for teams from other sources
 	// ldap
 	if conf.LdapSettings != (config.LdapAuthConfig{}) {
-		conn, err := ldap.DialURL(conf.LdapSettings.LdapConnectUrl)
+		conn, err := ldaputil.Connect(conf.LdapSettings.LdapConnectUrl, conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
 		if err != nil {
 			return err
 		}
 		defer conn.Close()
 
-		err = conn.Bind(conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
-		if err != nil {
-			return err
-		}
-
-		searchRequest := ldap.NewSearchRequest(
-			conf.LdapSettings.LdapSearchBaseDn,
-			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		entries, err := ldaputil.SearchUsers(conn, conf.LdapSettings.LdapSearchBaseDn,
 			fmt.Sprintf("(&(objectClass=person)(memberOf=%s))", conf.LdapSettings.LdapTeamGroupDn),
 			[]string{"sAMAccountName"},
-			nil,
 		)
-
-		sr, err := conn.Search(searchRequest)
 		if err != nil {
 			return err
 		}
 
-		for _, entry := range sr.Entries {
+		for _, entry := range entries {
 			teamName := entry.GetAttributeValue("sAMAccountName")
 			t := TeamSchema{Name: teamName}
 			result := db.Where(&t).First(&t)

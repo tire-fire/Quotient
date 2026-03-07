@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"quotient/engine/config"
+	"quotient/internal/ldaputil"
 	"strings"
 	"time"
 
@@ -219,36 +220,25 @@ func auth(username string, password string) (map[string]any, error) {
 	// auth from other sources
 	// if ldap configs are present, try to auth against ldap
 	if conf.LdapSettings != (config.LdapAuthConfig{}) {
-		conn, err := ldap.DialURL(conf.LdapSettings.LdapConnectUrl)
+		conn, err := ldaputil.Connect(conf.LdapSettings.LdapConnectUrl, conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
 		if err != nil {
 			return nil, err
 		}
 		defer conn.Close()
 
-		// bind using the given username and password and searchbase from config
-		err = conn.Bind(conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
-		if err != nil {
-			return nil, err
-		}
-
-		searchRequest := ldap.NewSearchRequest(
-			conf.LdapSettings.LdapSearchBaseDn,
-			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		entries, err := ldaputil.SearchUsers(conn, conf.LdapSettings.LdapSearchBaseDn,
 			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"dn"},
-			nil,
 		)
-
-		sr, err := conn.Search(searchRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(sr.Entries) != 1 {
+		if len(entries) != 1 {
 			return nil, errors.New("user does not exist or too many entries returned")
 		}
 
-		userDN := sr.Entries[0].DN
+		userDN := entries[0].DN
 
 		err = conn.Bind(userDN, password)
 		if err != nil {
@@ -256,21 +246,16 @@ func auth(username string, password string) (map[string]any, error) {
 		}
 
 		// query for the user's roles
-		roleSearchRequest := ldap.NewSearchRequest(
-			conf.LdapSettings.LdapSearchBaseDn,
-			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		roleEntries, err := ldaputil.SearchUsers(conn, conf.LdapSettings.LdapSearchBaseDn,
 			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
-			nil,
 		)
-
-		sr, err = conn.Search(roleSearchRequest)
 		if err != nil {
 			return nil, err
 		}
 
 		hasAuthorizedRole := false
-		for _, entry := range sr.Entries {
+		for _, entry := range roleEntries {
 			for _, memberOf := range entry.GetAttributeValues("memberOf") {
 				if memberOf == conf.LdapSettings.LdapAdminGroupDn ||
 					memberOf == conf.LdapSettings.LdapRedGroupDn ||
@@ -342,33 +327,22 @@ func findRolesByUsername(username string, authSource string) ([]string, error) {
 
 	// Check LDAP users only if auth source is LDAP
 	if authSource == "ldap" && conf.LdapSettings != (config.LdapAuthConfig{}) {
-		conn, err := ldap.DialURL(conf.LdapSettings.LdapConnectUrl)
+		conn, err := ldaputil.Connect(conf.LdapSettings.LdapConnectUrl, conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
 		if err != nil {
 			return nil, err
 		}
 		defer conn.Close()
 
-		// bind using the given username and password and searchbase from config
-		err = conn.Bind(conf.LdapSettings.LdapBindDn, conf.LdapSettings.LdapBindPassword)
-		if err != nil {
-			return nil, err
-		}
-
 		// query for the user's roles
-		searchRequest := ldap.NewSearchRequest(
-			conf.LdapSettings.LdapSearchBaseDn,
-			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		entries, err := ldaputil.SearchUsers(conn, conf.LdapSettings.LdapSearchBaseDn,
 			fmt.Sprintf("(&(objectClass=person)(sAMAccountName=%s))", ldap.EscapeFilter(username)),
 			[]string{"memberOf"},
-			nil,
 		)
-
-		sr, err := conn.Search(searchRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, entry := range sr.Entries {
+		for _, entry := range entries {
 			for _, memberOf := range entry.GetAttributeValues("memberOf") {
 				if memberOf == conf.LdapSettings.LdapAdminGroupDn {
 					roles = append(roles, "admin")
