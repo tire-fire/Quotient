@@ -41,6 +41,9 @@ func SecurityHeaders(conf *config.ConfigSettings) Middleware {
 			// Permissions-Policy: Disable unnecessary browser features
 			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 
+			// Limit request body size to prevent memory exhaustion (CWE-400)
+			r.Body = http.MaxBytesReader(w, r.Body, 50<<20) // 50 MB
+
 			next(w, r)
 		}
 	}
