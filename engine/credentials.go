@@ -156,18 +156,40 @@ func (se *ScoringEngine) UpdateCredentials(teamID uint, credlistName string, use
 }
 
 func (se *ScoringEngine) GetCredlists() (any, error) {
+	type credlistService struct {
+		Name string `json:"name"`
+	}
+
 	var credlists []any
 	for _, credlist := range se.Config.CredlistSettings.Credlist {
 		var a struct {
-			Name      string   `json:"name"`
-			Path      string   `json:"path"`
-			Usernames []string `json:"usernames"`
-			Example   string   `json:"example"`
+			Name      string            `json:"name"`
+			Path      string            `json:"path"`
+			Usernames []string          `json:"usernames"`
+			Example   string            `json:"example"`
+			Services  []credlistService `json:"services"`
 		}
 		a.Name = credlist.CredlistName
 		a.Example = credlist.CredlistExplainText
 		a.Path = credlist.CredlistPath
 		a.Usernames = []string{}
+		a.Services = []credlistService{}
+
+		for _, box := range se.Config.Box {
+			for _, runner := range box.Runners {
+				if !runner.Runnable() {
+					continue
+				}
+				for _, usedList := range runner.GetCredlists() {
+					if usedList == credlist.CredlistPath || usedList == credlist.CredlistName {
+						a.Services = append(a.Services, credlistService{
+							Name: runner.GetName(),
+						})
+						break
+					}
+				}
+			}
+		}
 
 		// Get usernames from original credentials in DB
 		origCreds, err := se.DB.GetOriginalCredentials(credlist.CredlistPath)

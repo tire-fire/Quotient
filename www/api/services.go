@@ -65,18 +65,34 @@ func (a *API) GetTeamSummary(w http.ResponseWriter, r *http.Request) {
 		SlaCount     int              `json:"SlaCount"`
 		Last10Rounds []db.RoundSchema `json:"Last10Rounds"`
 		Uptime       float64          `json:"Uptime"`
+		Credlists    []string         `json:"Credlists,omitempty"`
+	}
+
+	req_roles := r.Context().Value("roles").([]string)
+	credlistsByService := make(map[string][]string)
+	if a.conf != nil && (slices.Contains(req_roles, "admin") || a.conf.MiscSettings.EasyPCR) {
+		for _, runner := range a.conf.AllChecks() {
+			if !runner.Runnable() {
+				continue
+			}
+			if lists := runner.GetCredlists(); len(lists) > 0 {
+				credlistsByService[runner.GetName()] = lists
+			}
+		}
 	}
 
 	a.eng.RLockUptime()
 	uptimeMap := a.eng.GetUptimePerService()
 	var s []summary
 	for _, v := range summaries {
-		uptime := uptimeMap[teamID][v["ServiceName"].(string)]
+		svcName := v["ServiceName"].(string)
+		uptime := uptimeMap[teamID][svcName]
 		s = append(s, summary{
-			ServiceName:  v["ServiceName"].(string),
+			ServiceName:  svcName,
 			SlaCount:     v["SlaCount"].(int),
 			Last10Rounds: v["Last10Rounds"].([]db.RoundSchema),
 			Uptime:       float64(uptime.PassedChecks) / float64(uptime.TotalChecks),
+			Credlists:    credlistsByService[svcName],
 		})
 	}
 	a.eng.RUnlockUptime()

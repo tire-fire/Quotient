@@ -5,7 +5,7 @@
             <div class="row mb-3">
                 <div class="d-flex p-0">
                     <div>
-                        <select class="form-select" id="team-select">
+                        <select class="form-select" id="team-select" aria-label="Select Team">
                         </select>
                     </div>
                 </div>
@@ -74,7 +74,10 @@
         <button type="button" class="btn p-4" data-bs-dismiss="offcanvas" aria-label="Close">
             <i class="bi bi-arrow-left"></i>
         </button>
-        <h5 class="offcanvas-title" id="drilldown__label">Title</h5>
+        <div class="d-flex flex-wrap align-items-center justify-content-between flex-grow-1 gap-2 pe-3">
+            <h5 class="offcanvas-title mb-0" id="drilldown__label">Title</h5>
+            <div id="drilldown__pcr-links" class="d-flex flex-wrap gap-1"></div>
+        </div>
     </div>
     <div class="offcanvas-body small">
         <table class="table">
@@ -217,6 +220,42 @@
 
                     slas.textContent = SLACOUNT
                     name.textContent = SERVICENAME
+                    const latestRound = Array.isArray(LAST10ROUNDS) && LAST10ROUNDS.length > 0 ? LAST10ROUNDS[0] : null
+                    const latestCheck = latestRound && Array.isArray(latestRound.Checks)
+                        ? latestRound.Checks.find(c => c.ServiceName === SERVICENAME)
+                        : null
+                    const isLatestDown = Boolean(latestCheck && latestCheck.Result === false)
+
+                    if (Array.isArray(SUMMARY.Credlists) && SUMMARY.Credlists.length > 0) {
+                        const pcrBadge = document.createElement("span")
+                        const firstCredlist = SUMMARY.Credlists[0]
+                        const listLabels = SUMMARY.Credlists.map(c => c.replace(/\.credlist$/i, "")).join(", ")
+                        pcrBadge.className = "badge bg-body-secondary border text-body ms-2 fw-normal"
+                        pcrBadge.style.cursor = "pointer"
+                        pcrBadge.setAttribute("role", "link")
+                        pcrBadge.setAttribute("tabindex", "0")
+                        pcrBadge.setAttribute("data-bs-toggle", "tooltip")
+                        pcrBadge.setAttribute("data-bs-title", "Click to open PCR for " + listLabels)
+                        const icon = document.createElement("i")
+                        icon.className = "bi bi-key-fill text-primary me-1"
+                        icon.setAttribute("aria-hidden", "true")
+                        pcrBadge.appendChild(icon)
+                        pcrBadge.appendChild(document.createTextNode("PCR: " + listLabels))
+                        const openPcr = (e) => {
+                            e.stopPropagation()
+                            window.location.href = `/pcr?team=${encodeURIComponent(team_id)}&credlist=${encodeURIComponent(firstCredlist)}`
+                        }
+                        pcrBadge.addEventListener("click", openPcr)
+                        pcrBadge.addEventListener("keydown", (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                openPcr(e)
+                            }
+                        })
+                        name.appendChild(pcrBadge)
+                        service.setAttribute("data-credlists", JSON.stringify(SUMMARY.Credlists))
+                        service.setAttribute("data-latest-down", isLatestDown ? "1" : "0")
+                    }
                     uptime_text.textContent = UPTIME + "%"
                     uptime.style.width = UPTIME + "%"
                     if (UPTIME >= 80) {
@@ -235,8 +274,10 @@
                                 let icon = document.createElement("img")
                                 if (check.Result) {
                                     icon.src = "/static/assets/services/up.png"
+                                    icon.alt = "Up"
                                 } else {
                                     icon.src = "/static/assets/services/down.png"
+                                    icon.alt = "Down"
                                 }
                                 icon.height = 25
                                 icon.width = 25
@@ -248,6 +289,7 @@
                         if (!checkFoundInRound) {
                             let icon = document.createElement("img")
                             icon.src = "/static/assets/services/pending.png"
+                            icon.alt = "Pending"
                             icon.height = 25
                             icon.width = 25
                             icon.setAttribute("data-bs-toggle", "tooltip")
@@ -293,6 +335,32 @@
                         const HIGHLIGHT_ROUND = source.currentTarget.getAttribute("data-highlight-round")
                         updateUrlParams({ team: TEAM_ID, service: SERVICE_ID, round: HIGHLIGHT_ROUND })
                         DRILLDOWN_TITLE.textContent = "Service: " + SERVICE_ID
+                        const pcrLinksContainer = document.getElementById("drilldown__pcr-links")
+                        if (pcrLinksContainer) {
+                            pcrLinksContainer.innerHTML = ""
+                            try {
+                                const credlists = JSON.parse(source.currentTarget.getAttribute("data-credlists") || "[]")
+                                const latestDown = source.currentTarget.getAttribute("data-latest-down") === "1"
+                                credlists.forEach((credlistPath) => {
+                                    const link = document.createElement("a")
+                                    link.className = latestDown ? "btn btn-sm btn-primary" : "btn btn-sm btn-outline-primary"
+                                    link.href = `/pcr?team=${encodeURIComponent(TEAM_ID)}&credlist=${encodeURIComponent(credlistPath)}`
+                                    const icon = document.createElement("i")
+                                    icon.className = "bi bi-key-fill me-1"
+                                    icon.setAttribute("aria-hidden", "true")
+                                    link.appendChild(icon)
+                                    const label = credlistPath.replace(/\.credlist$/i, "")
+                                    link.appendChild(document.createTextNode(
+                                        latestDown
+                                            ? `Changed passwords? Submit PCR (${label})`
+                                            : `Submit PCR (${label})`
+                                    ))
+                                    pcrLinksContainer.appendChild(link)
+                                })
+                            } catch (e) {
+                                console.error("Failed to parse service credlists:", e)
+                            }
+                        }
                         DRILLDOWN_LIST.textContent = ""
                         DRILLDOWN_LIST.appendChild(DRILLDOWN_PLACEHOLDER.cloneNode(true))
                         fetch(`/api/services/${TEAM_ID}/${SERVICE_ID}`)
