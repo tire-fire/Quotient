@@ -131,6 +131,7 @@ type MiscConfig struct {
 type UIConfig struct {
 	EnablePublicGraphs                  bool
 	DisableGraphsForBlueTeam            bool
+	AllowNonAnonymizedGraphs            bool
 	AllowNonAnonymizedGraphsForBlueTeam bool
 	ShowAnnouncementsForRedTeam         bool
 }
@@ -334,6 +335,10 @@ func checkConfig(conf *ConfigSettings) error {
 
 	if conf.MiscSettings.SlaPenalty == 0 {
 		conf.MiscSettings.SlaPenalty = conf.MiscSettings.SlaThreshold * conf.MiscSettings.Points
+	}
+
+	if conf.UISettings.AllowNonAnonymizedGraphsForBlueTeam {
+		conf.UISettings.AllowNonAnonymizedGraphs = true
 	}
 
 	// OIDC settings defaults

@@ -227,7 +227,7 @@ func shouldScrub(r *http.Request) bool {
 		}
 	}
 
-	if conf.UISettings.AllowNonAnonymizedGraphsForBlueTeam {
+	if conf.UISettings.AllowNonAnonymizedGraphs || conf.UISettings.AllowNonAnonymizedGraphsForBlueTeam {
 		return false
 	}
 	return true
