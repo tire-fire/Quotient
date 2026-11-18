@@ -1,20 +1,17 @@
 package checks
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/corpix/uarand"
 )
 
 type Web struct {
@@ -33,24 +30,29 @@ type urlData struct {
 
 func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
-		u := c.Url[rand.Intn(len(c.Url))] // #nosec G404 -- non-crypto selection of URL to test
+		u := c.Url[rand.IntN(len(c.Url))] // #nosec G404 -- non-crypto selection of URL to test
 
-		// random user agent
-		ua := uarand.GetRandom()
-
-		tr := &http.Transport{
-			MaxIdleConns:      1,
-			IdleConnTimeout:   time.Duration(c.Timeout) * time.Second, // address this
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // #nosec G402 -- competition services may use self-signed certs
-			},
-		}
+		// Look like one browser build throughout: User-Agent, client hints,
+		// header order, TLS ClientHello and connection reuse all come from
+		// the same profile.
+		tr := newBrowserTransport(randomBrowserProfile())
+		// Keep the connection open for a while after the check, as a browser
+		// tab does, instead of closing it right after the response.
+		defer time.AfterFunc(webKeepAliveLinger(), tr.CloseIdleConnections)
 		// Set client timeout to slightly less than check timeout to get better error messages
 		clientTimeout := time.Duration(c.Timeout) * time.Second
 		client := &http.Client{
 			Transport: tr,
 			Timeout:   clientTimeout,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return errors.New("stopped after 10 redirects") // same limit and message as http.Client's default
+				}
+				// A browser sends no Referer when following a redirect of a
+				// typed-in navigation.
+				req.Header.Del("Referer")
+				return nil
+			},
 		}
 
 		requestURL := fmt.Sprintf("%s://%s:%d%s", c.Scheme, c.Target, c.Port, u.Path)
@@ -69,8 +71,6 @@ func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
-		req.Header.Set("User-Agent", ua)
-
 		// Store request info for timeout debugging
 		checkResult.Debug = fmt.Sprintf("Attempting GET %s", requestURL)
 
@@ -86,6 +86,12 @@ func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				slog.Error("failed to close http response body", "error", err)
+			}
+		}()
+
 		if u.Status != 0 && resp.StatusCode != u.Status {
 			checkResult.Error = "status returned by webserver was incorrect"
 			checkResult.Debug = "status was " + strconv.Itoa(resp.StatusCode) + " wanted " + strconv.Itoa(u.Status) + " for url " + u.Path
@@ -93,11 +99,6 @@ func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				slog.Error("failed to close http response body", "error", err)
-			}
-		}()
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			checkResult.Error = "error reading page content"
@@ -133,6 +134,14 @@ func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 	}
 
 	c.Service.Run(teamID, teamIdentifier, roundID, resultsChan, definition)
+}
+
+// webKeepAliveLinger is how long a web check leaves its idle connection open.
+// Browsers keep idle connections for minutes (Firefox 115 s), so the server's
+// keep-alive timeout usually ends them; closing right after the response is
+// what scripts do.
+func webKeepAliveLinger() time.Duration {
+	return 30*time.Second + rand.N(80*time.Second) // #nosec G404 -- non-crypto timing jitter
 }
 
 func (c *Web) Verify(box string, ip string, points int, timeout int, slapenalty int, slathreshold int) error {
