@@ -436,7 +436,9 @@ port = 53
 
 #### Web Check
 
-HTTP/HTTPS request with optional status code and content matching. Each run picks a desktop Chrome profile (Windows, macOS or Linux) and sends what that browser sends for a typed-in URL: its User-Agent, client hints and request headers in Chrome's order, Chrome's TLS ClientHello (via uTLS, offering HTTP/2), and a keep-alive connection that is reused for redirects and left open for 30–110 seconds afterwards. Compressed responses (gzip, deflate, br, zstd) are decoded before matching.
+HTTP/HTTPS request with optional status code and content matching. Each run picks a desktop Chrome profile (Windows, macOS or Linux) and sends what that browser sends for a typed-in URL: its User-Agent, client hints and request headers in Chrome's order, Chrome's TLS ClientHello (via uTLS, offering HTTP/2), and a keep-alive connection that is reused for redirects and left open for 30–110 seconds afterwards. Its sockets carry the IP TTL of the profile's OS (128 for Windows, 64 for macOS and Linux, plus `QUOTIENT_RUNNER_EXTRA_HOPS` from the runner's environment). The claimed Chrome release is `ChromeMajor` in `engine/checks/chrome.go`. Compressed responses (gzip, deflate, br, zstd) are decoded before matching.
+
+There is no switch back to Go's own HTTP client: a server that breaks for real Chrome (its headers, client hints or HTTP/2) fails the check, as it would fail a user.
 
 ```toml
 [[box.web]]
