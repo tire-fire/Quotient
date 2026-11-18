@@ -727,9 +727,10 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 	// reassign the next round start time with jitter drawn from [-Jitter, Jitter)
 	// at nanosecond resolution: whole-second jitter put round starts on whole
 	// seconds apart, which shows on the wire
+	roundStart := time.Now()
 	jitterRange := time.Duration(se.Config.MiscSettings.Jitter) * time.Second
 	jitter := time.Duration(rand.Int63n(int64(2*jitterRange))) - jitterRange // #nosec G404 -- non-crypto randomization for timing jitter
-	se.NextRoundStartTime = time.Now().Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second).Add(jitter)
+	se.NextRoundStartTime = roundStart.Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second).Add(jitter)
 
 	slog.Info(fmt.Sprintf("round should take %s", time.Until(se.NextRoundStartTime).String()))
 
@@ -773,6 +774,7 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 	if p := se.Config.MiscSettings.Spread; p != nil {
 		spread = *p
 	}
+	shortestRound := time.Duration(se.Config.MiscSettings.Delay-se.Config.MiscSettings.Jitter) * time.Second
 	var payloads []any
 	for _, team := range teams {
 		if !team.Active {
@@ -809,6 +811,11 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 				AttemptDelay:   r.GetAttemptDelay(),
 				Spread:         spread,
 				CheckData:      data, // the entire specialized struct
+			}
+			// Each team's check gets its own start offset, drawn again every round.
+			if spread > 0 {
+				task.StartAt = SpreadStart(roundStart, shortestRound, r.GetTimeout(), task.Attempts, task.AttemptDelay,
+					time.Duration(spread)*time.Second, rand.Int63n) // #nosec G404 -- non-crypto randomization of check timing
 			}
 
 			// Populate credentials if check needs them
