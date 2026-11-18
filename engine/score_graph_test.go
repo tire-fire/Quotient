@@ -25,7 +25,7 @@ func processRound(t *testing.T, se *ScoringEngine, round uint, results ...checks
 	for i := range results {
 		results[i].RoundID = round
 	}
-	require.NoError(t, se.processCollectedResults(results, se.resetGeneration()))
+	require.NoError(t, se.processCollectedResults(se.Config.Current(), results, se.resetGeneration()))
 }
 
 func exportTotal(t *testing.T, se *ScoringEngine, team uint) int {

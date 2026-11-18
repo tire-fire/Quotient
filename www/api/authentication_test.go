@@ -85,7 +85,7 @@ func TestLogoutEndpoint(t *testing.T) {
 // TestLogoutMethodRestriction verifies that only POST is accepted on /api/logout.
 func TestLogoutMethodRestriction(t *testing.T) {
 	mux := http.NewServeMux()
-	a := &API{conf: &config.ConfigSettings{}}
+	a := &API{conf: config.NewLive(&config.ConfigSettings{})}
 
 	// Register only POST, matching www/router.go.
 	mux.HandleFunc("POST /api/logout", a.Logout)
@@ -146,7 +146,7 @@ func TestPasswordChangeInvalidatesLocalSession(t *testing.T) {
 		{Name: "admin", Pw: "leaked-password"},
 		{Name: "other", Pw: "other-password"},
 	}}
-	a := NewAPI(conf, nil)
+	a := NewAPI(config.NewLive(conf), nil)
 	stolen := loginCookie(t, a, "admin", "leaked-password")
 	untouched := loginCookie(t, a, "other", "other-password")
 
@@ -169,7 +169,7 @@ func TestPasswordChangeInvalidatesLocalSession(t *testing.T) {
 // A local session cookie issued without a credential fingerprint (before the
 // fingerprint existed) is rejected, forcing one fresh login.
 func TestLocalSessionWithoutCredentialRejected(t *testing.T) {
-	a := NewAPI(&config.ConfigSettings{Admin: []config.Admin{{Name: "admin", Pw: "pw"}}}, nil)
+	a := NewAPI(config.NewLive(&config.ConfigSettings{Admin: []config.Admin{{Name: "admin", Pw: "pw"}}}), nil)
 	value, err := CookieEncoder.Encode(COOKIENAME, map[string]any{"username": "admin", "authSource": "local"})
 	require.NoError(t, err)
 

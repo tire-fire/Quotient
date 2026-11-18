@@ -77,7 +77,7 @@ func collectSetup(t *testing.T, teams int, services ...string) (*ScoringEngine, 
 	for _, s := range services {
 		runners = append(runners, &mockRunner{Service: checks.Service{Display: s, Name: "box01-" + s, ServiceType: "Mock", Points: 10}})
 	}
-	se.Config.Box = []config.Box{{Name: "box01", IP: "192.0.2.1", Runners: runners}}
+	se.Config.Current().Box = []config.Box{{Name: "box01", IP: "192.0.2.1", Runners: runners}}
 	return se, redis, pg, created
 }
 

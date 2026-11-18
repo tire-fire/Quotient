@@ -24,7 +24,9 @@ import (
 )
 
 type ScoringEngine struct {
-	Config *config.ConfigSettings
+	// Config is shared with the web server. Take one Current() snapshot per
+	// unit of work: a hot reload swaps in a new snapshot at any time.
+	Config *config.Live
 	// credentialsMutex holds one lock per team. Seeding runs on the engine
 	// goroutine while the web server serves, so credentialsMu guards the map.
 	credentialsMutex      map[uint]*sync.Mutex
@@ -69,11 +71,13 @@ type ScoringEngine struct {
 var errReset = errors.New("reset event received")
 
 
-func NewEngine(conf *config.ConfigSettings, configPath string) *ScoringEngine {
+func NewEngine(configPath string) *ScoringEngine {
 	// Ensure config is properly validated and runners are set up
-	if err := conf.SetConfig(configPath); err != nil {
+	live := &config.Live{}
+	if err := live.Reload(configPath); err != nil {
 		panic(fmt.Sprintf("Failed to validate initial config: %v", err))
 	}
+	conf := live.Current()
 
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
@@ -94,7 +98,7 @@ func NewEngine(conf *config.ConfigSettings, configPath string) *ScoringEngine {
 	}
 
 	se := &ScoringEngine{
-		Config:           conf,
+		Config:           live,
 		credentialsMutex: make(map[uint]*sync.Mutex),
 		UptimePerService: make(map[uint]map[string]db.Uptime),
 		SlaPerService:    make(map[uint]map[string]int),
@@ -106,8 +110,8 @@ func NewEngine(conf *config.ConfigSettings, configPath string) *ScoringEngine {
 		panic(fmt.Sprintf("Failed to read competition state: %v", err))
 	}
 
-	if err := conf.WatchConfig(configPath, func() {
-		if err := se.DB.AddTeams(se.Config); err != nil {
+	if err := live.WatchConfig(configPath, func() {
+		if err := se.DB.AddTeams(se.Config.Current()); err != nil {
 			slog.Error("failed to add teams on config reload", "error", err)
 		}
 		if err := se.EnsureCredentialsSeeded(); err != nil {
@@ -162,14 +166,15 @@ func (se *ScoringEngine) Start() {
 			if se.pauseAtCompetitionEnd(schedule) {
 				continue
 			}
+			conf := se.Config.Current()
 			se.CurrentRoundStartTime = time.Now()
-			se.NextRoundStartTime = time.Now().Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second)
+			se.NextRoundStartTime = time.Now().Add(time.Duration(conf.MiscSettings.Delay) * time.Second)
 
 		var err error
 		if se.roundFunc != nil {
 			err = se.roundFunc()
 		} else {
-			switch se.Config.RequiredSettings.EventType {
+			switch conf.RequiredSettings.EventType {
 			case "koth":
 				err = se.koth()
 			case "rvb":
@@ -179,7 +184,7 @@ func (se *ScoringEngine) Start() {
 					err = se.rvb()
 				}
 			default:
-				slog.Error("Unknown event type", "eventType", se.Config.RequiredSettings.EventType)
+				slog.Error("Unknown event type", "eventType", conf.RequiredSettings.EventType)
 			}
 		}
 		if err != nil {
@@ -214,7 +219,7 @@ func (se *ScoringEngine) loadRoundState() error {
 		return fmt.Errorf("load uptimes: %w", err)
 	}
 	slas := make(map[uint]map[string]int)
-	if err := se.DB.LoadSLAs(&slas, se.Config.MiscSettings.SlaThreshold); err != nil {
+	if err := se.DB.LoadSLAs(&slas, se.Config.Current().MiscSettings.SlaThreshold); err != nil {
 		return fmt.Errorf("load SLAs: %w", err)
 	}
 
@@ -419,7 +424,7 @@ func (se *ScoringEngine) loadPauseState() error {
 	if err != nil {
 		return err
 	}
-	paused := se.Config.MiscSettings.StartPaused
+	paused := se.Config.Current().MiscSettings.StartPaused
 	if state.Paused != nil {
 		paused = *state.Paused
 	}
@@ -520,7 +525,7 @@ func (se *ScoringEngine) CompetitionSchedule() (Schedule, error) {
 	if err != nil {
 		return Schedule{}, err
 	}
-	return effectiveSchedule(state, se.Config.InjectSettings), nil
+	return effectiveSchedule(state, se.Config.Current().InjectSettings), nil
 }
 
 // SetCompetitionSchedule stores a runtime schedule that replaces event.conf's
@@ -529,7 +534,7 @@ func (se *ScoringEngine) SetCompetitionSchedule(start, end *time.Time) error {
 	if start != nil && end != nil && !end.After(*start) {
 		return ErrEndBeforeStart
 	}
-	next := effectiveSchedule(db.CompetitionStateSchema{ScheduledStart: start, ScheduledEnd: end}, se.Config.InjectSettings)
+	next := effectiveSchedule(db.CompetitionStateSchema{ScheduledStart: start, ScheduledEnd: end}, se.Config.Current().InjectSettings)
 	noStart, err := se.DB.SetCompetitionSchedule(start, end, next.Start, next.End)
 	if err != nil {
 		return err
@@ -715,13 +720,14 @@ func (se *ScoringEngine) koth() error {
 func (se *ScoringEngine) rvb() error {
 	slog.Info("Starting round", "round", se.CurrentRound)
 	gen := se.resetGeneration()
-	results, err := se.runChecks(se.CurrentRound, false)
+	conf := se.Config.Current()
+	results, err := se.runChecks(conf, se.CurrentRound, false)
 	if err != nil {
 		return err
 	}
 	// A failed write leaves CurrentRound unchanged, so the round loop's retry
 	// runs this round ID again instead of skipping it.
-	if err := se.processCollectedResults(results, gen); err != nil {
+	if err := se.processCollectedResults(conf, results, gen); err != nil {
 		return err
 	}
 	se.finishScoredRound()
@@ -764,7 +770,7 @@ func (se *ScoringEngine) preflight() error {
 	round := db.PreflightRoundSchema{ID: last + 1, StartTime: se.CurrentRoundStartTime}
 	slog.Info("Starting preflight round", "preflight_round", round.ID)
 	gen := se.resetGeneration()
-	results, err := se.runChecks(round.ID, true)
+	results, err := se.runChecks(se.Config.Current(), round.ID, true)
 	if err != nil {
 		return err
 	}
@@ -796,12 +802,13 @@ func (se *ScoringEngine) preflight() error {
 	return nil
 }
 
-func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Result, error) {
+// runChecks enqueues the checks of conf, one config snapshot for the whole round.
+func (se *ScoringEngine) runChecks(conf *config.ConfigSettings, roundID uint, preflight bool) ([]checks.Result, error) {
 	// reassign the next round start time with jitter
 	// double the jitter and subtract it to get a random number between -jitter and jitter
-	randomJitter := rand.Intn(2*se.Config.MiscSettings.Jitter) - se.Config.MiscSettings.Jitter // #nosec G404 -- non-crypto randomization for timing jitter
+	randomJitter := rand.Intn(2*conf.MiscSettings.Jitter) - conf.MiscSettings.Jitter // #nosec G404 -- non-crypto randomization for timing jitter
 	jitter := time.Duration(randomJitter) * time.Second
-	se.NextRoundStartTime = time.Now().Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second).Add(jitter)
+	se.NextRoundStartTime = time.Now().Add(time.Duration(conf.MiscSettings.Delay) * time.Second).Add(jitter)
 
 	slog.Info(fmt.Sprintf("round should take %s", time.Until(se.NextRoundStartTime).String()))
 
@@ -825,13 +832,13 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 	defer cancel()
 
 	slog.Debug("Starting service checks", "round", roundID, "preflight", preflight)
-	allRunners := se.Config.AllChecks()
+	allRunners := conf.AllChecks()
 	slog.Info("Service check configuration",
-		"boxes", len(se.Config.Box),
+		"boxes", len(conf.Box),
 		"runners", len(allRunners))
 
 	// Log details about each box's runners
-	for _, box := range se.Config.Box {
+	for _, box := range conf.Box {
 		slog.Debug("Box configuration", "name", box.Name, "runners", len(box.Runners))
 	}
 
@@ -1007,7 +1014,7 @@ func sanitizeDBString(s string) string {
 // processCollectedResults stores the round, its checks and any SLA violations
 // in one transaction, and updates the in-memory uptime and SLA streaks only
 // after it commits, so a failed write leaves both untouched.
-func (se *ScoringEngine) processCollectedResults(results []checks.Result, gen uint64) error {
+func (se *ScoringEngine) processCollectedResults(conf *config.ConfigSettings, results []checks.Result, gen uint64) error {
 	if len(results) == 0 {
 		slog.Warn("No results collected for round", "round", se.CurrentRound)
 		return nil
@@ -1051,12 +1058,12 @@ func (se *ScoringEngine) processCollectedResults(results []checks.Result, gen ui
 			streak = 0
 		} else {
 			streak++
-			if streak >= se.Config.MiscSettings.SlaThreshold {
+			if streak >= conf.MiscSettings.SlaThreshold {
 				slas = append(slas, db.SLASchema{
 					TeamID:      result.TeamID,
 					ServiceName: result.ServiceName,
 					RoundID:     uint(se.CurrentRound),
-					Penalty:     *se.Config.MiscSettings.SlaPenalty,
+					Penalty:     *conf.MiscSettings.SlaPenalty,
 				})
 				streak = 0
 			}
@@ -1135,7 +1142,7 @@ func NewTestEngine(t *testing.T, redis *testutil.RedisContainer, pg *testutil.Po
 	}
 
 	se := &ScoringEngine{
-		Config:           conf,
+		Config:           config.NewLive(conf),
 		credentialsMutex: make(map[uint]*sync.Mutex),
 		UptimePerService: make(map[uint]map[string]db.Uptime),
 		SlaPerService:    make(map[uint]map[string]int),

@@ -31,12 +31,13 @@ const COOKIENAME = "quotient"
 
 // cookieSecure returns whether cookies should use the Secure flag (HTTPS only)
 func (a *API) cookieSecure() bool {
+	conf := a.conf.Current()
 	// If OIDC is enabled and using HTTPS callback, enforce secure cookies
-	if a.conf.OIDCSettings.OIDCEnabled && strings.HasPrefix(a.conf.OIDCSettings.OIDCRedirectURL, "https://") {
+	if conf.OIDCSettings.OIDCEnabled && strings.HasPrefix(conf.OIDCSettings.OIDCRedirectURL, "https://") {
 		return true
 	}
 	// Otherwise, use secure cookies only if SSL is configured
-	return a.conf.SslSettings != (config.SslConfig{})
+	return conf.SslSettings != (config.SslConfig{})
 }
 
 func init() {
@@ -215,14 +216,15 @@ func (a *API) Authenticate(w http.ResponseWriter, r *http.Request) (Identity, bo
 }
 
 func (a *API) auth(username string, password string) (map[string]any, error) {
+	conf := a.conf.Current()
 	if a.localPasswordMatches(username, password) {
 		return map[string]any{"username": username, "authSource": "local", "credential": a.localCredential(username)}, nil
 	}
 
 	// auth from other sources
 	// if ldap configs are present, try to auth against ldap
-	if a.conf.LdapSettings != (config.LdapAuthConfig{}) {
-		groups, err := ldapdir.Authenticate(a.conf.LdapSettings, username, password)
+	if conf.LdapSettings != (config.LdapAuthConfig{}) {
+		groups, err := ldapdir.Authenticate(conf.LdapSettings, username, password)
 		if err != nil {
 			return nil, err
 		}
@@ -238,22 +240,23 @@ func (a *API) auth(username string, password string) (map[string]any, error) {
 // localPasswordMatches reports whether password is the configured password of
 // a local account named username, in any role.
 func (a *API) localPasswordMatches(username, password string) bool {
-	for _, admin := range a.conf.Admin {
+	conf := a.conf.Current()
+	for _, admin := range conf.Admin {
 		if username == admin.Name && password == admin.Pw {
 			return true
 		}
 	}
-	for _, team := range a.conf.Team {
+	for _, team := range conf.Team {
 		if username == team.Name && password == team.Pw {
 			return true
 		}
 	}
-	for _, red := range a.conf.Red {
+	for _, red := range conf.Red {
 		if username == red.Name && password == red.Pw {
 			return true
 		}
 	}
-	for _, inject := range a.conf.Inject {
+	for _, inject := range conf.Inject {
 		if username == inject.Name && password == inject.Pw {
 			return true
 		}
@@ -267,6 +270,7 @@ func (a *API) localPasswordMatches(username, password string) bool {
 // sessions issued before the change. It is an HMAC keyed with the cookie hash
 // key, so the cookie never carries the password or a plain hash of it.
 func (a *API) localCredential(username string) string {
+	conf := a.conf.Current()
 	mac := hmac.New(sha256.New, hashKey)
 	_, _ = fmt.Fprintf(mac, "local-session\x00%d:%s", len(username), username)
 	add := func(role, name, pw string) {
@@ -274,16 +278,16 @@ func (a *API) localCredential(username string) string {
 			_, _ = fmt.Fprintf(mac, "\x00%s\x00%d:%s", role, len(pw), pw)
 		}
 	}
-	for _, admin := range a.conf.Admin {
+	for _, admin := range conf.Admin {
 		add("admin", admin.Name, admin.Pw)
 	}
-	for _, red := range a.conf.Red {
+	for _, red := range conf.Red {
 		add("red", red.Name, red.Pw)
 	}
-	for _, team := range a.conf.Team {
+	for _, team := range conf.Team {
 		add("team", team.Name, team.Pw)
 	}
-	for _, inject := range a.conf.Inject {
+	for _, inject := range conf.Inject {
 		add("inject", inject.Name, inject.Pw)
 	}
 	return base64.RawStdEncoding.EncodeToString(mac.Sum(nil)[:16])
