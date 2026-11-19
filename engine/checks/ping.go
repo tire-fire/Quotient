@@ -30,6 +30,7 @@ func (c Ping) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan 
 		pinger.Timeout = 5 * time.Second
 		// 56 data bytes, the iputils and BSD ping default (go-ping sends 24 otherwise).
 		pinger.Size = 56
+		pinger.TTL = clientLinux.ttl() // iputils on Linux, like the payload
 		pinger.SetPrivileged(true)
 		err = pinger.Run()
 		if err != nil {
