@@ -724,11 +724,13 @@ func (se *ScoringEngine) preflight() error {
 }
 
 func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Result, error) {
-	// reassign the next round start time with jitter
-	// double the jitter and subtract it to get a random number between -jitter and jitter
-	randomJitter := rand.Intn(2*se.Config.MiscSettings.Jitter) - se.Config.MiscSettings.Jitter // #nosec G404 -- non-crypto randomization for timing jitter
-	jitter := time.Duration(randomJitter) * time.Second
-	se.NextRoundStartTime = time.Now().Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second).Add(jitter)
+	// reassign the next round start time with jitter drawn from [-Jitter, Jitter)
+	// at nanosecond resolution: whole-second jitter put round starts on whole
+	// seconds apart, which shows on the wire
+	roundStart := time.Now()
+	jitterRange := time.Duration(se.Config.MiscSettings.Jitter) * time.Second
+	jitter := time.Duration(rand.Int63n(int64(2*jitterRange))) - jitterRange // #nosec G404 -- non-crypto randomization for timing jitter
+	se.NextRoundStartTime = roundStart.Add(time.Duration(se.Config.MiscSettings.Delay) * time.Second).Add(jitter)
 
 	slog.Info(fmt.Sprintf("round should take %s", time.Until(se.NextRoundStartTime).String()))
 
@@ -743,7 +745,6 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 		return nil, err
 	}
 
-	runners := 0
 	ctx, cancel := context.WithTimeout(context.Background(), time.Until(se.NextRoundStartTime))
 	defer cancel()
 
@@ -768,6 +769,13 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 		}
 	}
 
+	// Spread is nil only in configs that skipped checkConfig (tests): off.
+	spread := 0
+	if p := se.Config.MiscSettings.Spread; p != nil {
+		spread = *p
+	}
+	shortestRound := time.Duration(se.Config.MiscSettings.Delay-se.Config.MiscSettings.Jitter) * time.Second
+	var payloads []any
 	for _, team := range teams {
 		if !team.Active {
 			continue
@@ -801,7 +809,13 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 				Deadline:       se.NextRoundStartTime,
 				Attempts:       r.GetAttempts(),
 				AttemptDelay:   r.GetAttemptDelay(),
+				Spread:         spread,
 				CheckData:      data, // the entire specialized struct
+			}
+			// Each team's check gets its own start offset, drawn again every round.
+			if spread > 0 {
+				task.StartAt = SpreadStart(roundStart, shortestRound, r.GetTimeout(), task.Attempts, task.AttemptDelay,
+					time.Duration(spread)*time.Second, rand.Int63n) // #nosec G404 -- non-crypto randomization of check timing
 			}
 
 			// Populate credentials if check needs them
@@ -832,10 +846,18 @@ func (se *ScoringEngine) runChecks(roundID uint, preflight bool) ([]checks.Resul
 				slog.Error("failed to marshal service task", "error", err)
 				continue
 			}
-			se.RedisClient.RPush(ctx, "tasks", payload)
-			runners++
+			payloads = append(payloads, payload)
 		}
 	}
+	// Queue order is start order: shuffled, so no team or service is always
+	// checked first.
+	rand.Shuffle(len(payloads), func(i, j int) { payloads[i], payloads[j] = payloads[j], payloads[i] }) // #nosec G404 -- non-crypto randomization of check order
+	if len(payloads) > 0 {
+		if err := se.RedisClient.RPush(ctx, "tasks", payloads...).Err(); err != nil {
+			slog.Error("failed to enqueue tasks", "count", len(payloads), "error", err)
+		}
+	}
+	runners := len(payloads)
 	slog.Info("Enqueued checks", "count", runners)
 
 	results := make([]checks.Result, 0, runners)

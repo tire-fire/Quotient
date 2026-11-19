@@ -260,6 +260,7 @@ StartPaused = true          # Start with the engine paused (no preflight or scor
 # Round timing
 Delay = 60                  # Seconds between rounds (default: 60)
 Jitter = 10                 # Random jitter in seconds (default: 5, must be < Delay)
+Spread = 50                 # Max seconds a check is held back at random within its round (default: Delay - Jitter; 0 = off)
 
 # Scoring defaults (can be overridden per-check)
 Points = 5                  # Points per successful check (default: 1)
@@ -271,6 +272,8 @@ AttemptDelay = 0            # Seconds to wait before retrying a failed attempt (
 ```
 
 Every attempt, plus the waits between them, must fit in the shortest round: `Attempts * Timeout + (Attempts - 1) * AttemptDelay` must be less than `Delay - Jitter`.
+
+`Spread` keeps rounds from reaching every team and service at the same instant or in the same order. Every round, the engine draws a start offset for each team's check of each service, uniformly over `[0, min(Spread, Delay - Jitter - (Attempts * Timeout + (Attempts - 1) * AttemptDelay) - 2)]` seconds from the round start, and the runner starts the first attempt then. The window uses the shortest possible round, so a check that starts at the end of it still finishes in time, and results are the same as without spreading. With `Delay = 120`, `Jitter = 10`, `Timeout = 30`, `Attempts = 1` that window is 0 to 78 s. Retries (`Attempts > 1`) also wait a random extra past `AttemptDelay`, drawn from the slack left before the round's deadline. With `Attempts = 2` and `AttemptDelay = 45` the first-attempt window shrinks to 0 to 3 s.
 
 In rvb events, rounds that run while the competition is not started and no scored round has been stored are **preflight rounds**. They run the same checks a scored round would (inactive teams, disabled team services and checks without seeded credentials are skipped alike) and publish `round_finish` for Divisor, but their results are stored apart and never count toward scored points, uptime or SLAs. Leave `StartPaused = false` to have preflight rounds run as soon as the engine is up. While in preflight, `/graphs` (service status and uptime), `/services`, `/admin/engine`, and `/admin/runners` show preflight results to admins while non-admin access stays blocked; once the competition starts, those views show scored rounds. Stopping a competition that has stored scored rounds does not bring preflight rounds back; resetting scores stops the competition and drops scored and preflight rounds so the engine re-enters preflight. Injects keep their anchor: a reset does not forget when the competition first started. In custom checks the `ROUND` placeholder is the preflight round number during preflight and the scored round number afterwards, so both start at 1. A scheduled start (see *Competition Start and End*) opens the competition just like a manual *Start Competition*, so the first round after it is scored and no further preflight rounds run. A score reset keeps the recorded start, so it does not re-arm the scheduled start: after a reset the engine stays in preflight until an admin starts the competition.
 
