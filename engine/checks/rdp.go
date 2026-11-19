@@ -1,7 +1,6 @@
 package checks
 
 import (
-	"net"
 	"strconv"
 	"time"
 	// why are there no good rdp libraries?
@@ -13,13 +12,15 @@ type Rdp struct {
 
 func (c Rdp) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
-		_, err := net.DialTimeout("tcp", c.Target+":"+strconv.Itoa(c.Port), time.Duration(c.Timeout)*time.Second)
+		conn, err := clientLinux.dialer(time.Duration(c.Timeout)*time.Second).Dial("tcp", c.Target+":"+strconv.Itoa(c.Port))
 		if err != nil {
 			checkResult.Error = "connection error"
 			checkResult.Debug = err.Error()
 			response <- checkResult
 			return
 		}
+		// Close at once (FIN) instead of leaving an idle, silent connection open until GC or exit.
+		_ = conn.Close()
 		checkResult.Status = true
 		response <- checkResult
 	}
