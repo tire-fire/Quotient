@@ -44,6 +44,25 @@ func parseExtraHops(v string) int {
 	return n
 }
 
+// profileMark turns on the DSCP mark that tells a shaping Divisor which OS a
+// socket claims (environment QUOTIENT_PROFILE_MARK=dscp). Divisor then sets
+// the TTL and rewrites the SYN to that OS's, and clears the mark before
+// packets reach a team. Leave it unset without a shaping Divisor (SYN_SHAPE=on),
+// or the DSCP values reach the teams.
+var profileMark = os.Getenv("QUOTIENT_PROFILE_MARK") == "dscp"
+
+// dscp is the profile mark Divisor's shaping table matches (RFC 2474 pool 2,
+// experimental/local use): 7 Windows, 11 Linux, 15 macOS.
+func (o clientOS) dscp() int {
+	switch o {
+	case clientWindows:
+		return 7
+	case clientMacOS:
+		return 15
+	}
+	return 11
+}
+
 // initialTTL is the TTL the OS starts its packets with.
 func (o clientOS) initialTTL() int {
 	if o == clientWindows {

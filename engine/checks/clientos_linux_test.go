@@ -147,3 +147,25 @@ func captureSYN(t *testing.T, fd int, sport, dport uint16) (ttl, scale int) {
 }
 
 func htons(v uint16) uint16 { return v<<8 | v>>8 }
+
+// With QUOTIENT_PROFILE_MARK=dscp every socket carries its profile's DSCP,
+// which a shaping Divisor reads and clears; without it, none.
+func TestClientOSProfileMark(t *testing.T) {
+	defer func(m bool) { profileMark = m }(profileMark)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	for _, on := range []bool{false, true} {
+		profileMark = on
+		for o, dscp := range map[clientOS]int{clientWindows: 7, clientLinux: 11, clientMacOS: 15} {
+			conn, err := o.dialer(time.Second).Dial("tcp", ln.Addr().String())
+			require.NoError(t, err)
+			want := 0
+			if on {
+				want = dscp << 2
+			}
+			assert.Equal(t, want, sockoptInt(t, conn, syscall.IPPROTO_IP, syscall.IP_TOS), "%s, mark %v", o, on)
+			_ = conn.Close()
+		}
+	}
+}
