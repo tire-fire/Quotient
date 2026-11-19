@@ -194,6 +194,13 @@ func (se *ScoringEngine) Start() {
 			}
 			slog.Error("Round error, retrying next round", "error", err)
 		}
+		// Divisor rotates the runners' source addresses when it sees round_finish. A round that ran to
+		// its deadline (a lost or late result) would otherwise start the next round at once, while the
+		// rotation removes the address the new round's first checks connect from, and those checks
+		// time out against services that are up.
+		if earliest := time.Now().Add(roundFinishSettle); se.NextRoundStartTime.Before(earliest) {
+			se.NextRoundStartTime = earliest
+		}
 
 			slog.Info(fmt.Sprintf("Next round will start in %s, sleeping...", time.Until(se.NextRoundStartTime).String()))
 		}
@@ -206,6 +213,11 @@ func (se *ScoringEngine) Start() {
 
 // loadRetryDelay is how long Start waits before retrying a failed state load.
 const loadRetryDelay = 2 * time.Second
+
+// roundFinishSettle is the least time between a round_finish and the next round's start. Divisor
+// rotates runner source addresses on round_finish (about 1 s per address it probes, NUM_IPS of them),
+// so this only delays the round after one that ran to its deadline.
+const roundFinishSettle = 5 * time.Second
 
 // loadRoundState rebuilds the round counter, uptimes and SLA streaks from the
 // stored rounds, replacing what is in memory only if every read succeeded.
