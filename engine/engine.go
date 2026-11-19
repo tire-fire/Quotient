@@ -872,10 +872,13 @@ func (se *ScoringEngine) runChecks(conf *config.ConfigSettings, roundID uint, pr
 			if !r.Runnable() {
 				continue
 			}
+			// A failed read says nothing about whether the team's check should run. Skipping it would
+			// leave the check unscored in a round that is otherwise stored (seen in the Inv3 rehearsal:
+			// a Postgres restart at round start dropped 23 of 64 checks), so give up on the round and
+			// let the loop retry it under the same ID, as a failed round write does.
 			enabled, err := se.DB.IsTeamServiceEnabled(team.ID, r.GetName())
 			if err != nil {
-				slog.Error("failed to check service state", "team", team.ID, "service", r.GetName(), "error", err)
-				continue
+				return nil, fmt.Errorf("check service state for team %d %s: %w", team.ID, r.GetName(), err)
 			}
 			if !enabled {
 				continue
@@ -905,8 +908,7 @@ func (se *ScoringEngine) runChecks(conf *config.ConfigSettings, roundID uint, pr
 				for _, credlistName := range credlists {
 					creds, err := se.DB.GetTeamCredentials(team.ID, credlistName)
 					if err != nil {
-						slog.Error("failed to get credentials for task", "team", team.ID, "credlist", credlistName, "error", err)
-						continue
+						return nil, fmt.Errorf("get credentials for team %d credlist %s: %w", team.ID, credlistName, err)
 					}
 					for _, c := range creds {
 						task.Credentials = append(task.Credentials, Credential{
