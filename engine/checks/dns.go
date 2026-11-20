@@ -24,9 +24,7 @@ type DnsRecord struct {
 	Answer []string
 }
 
-// dnsKinds maps each supported record kind to its query type and answer
-// matcher. A matcher accepts only answers of its own kind: the team's server
-// chooses the answer type.
+// dnsKinds matchers accept only answers of their own kind: the team's server chooses the answer type.
 var dnsKinds = map[string]struct {
 	qtype   uint16
 	matches func(answer dns.RR, expected string) bool
@@ -43,12 +41,10 @@ var dnsKinds = map[string]struct {
 
 func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
-		// Pick a record
 		record := c.Record[rand.Intn(len(c.Record))] // #nosec G404 -- non-crypto selection of DNS record to test
 		kind := dnsKinds[record.Kind]
 		fqdn := dns.Fqdn(strings.ReplaceAll(dns.Fqdn(record.Domain), "_", teamIdentifier))
 
-		// Setup for dns query
 		var msg dns.Msg
 		msg.SetQuestion(fqdn, kind.qtype)
 
@@ -97,7 +93,6 @@ func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			}
 		}
 
-		// If we reach here no answer matched an expected value and check fails
 		checkResult.Error = "incorrect answer(s) received from DNS"
 		checkResult.Debug = "record " + record.Domain + "-> acceptable answers were: " + fmt.Sprint(record.Answer) + ", received " + fmt.Sprint(in.Answer)
 		response <- checkResult
