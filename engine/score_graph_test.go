@@ -111,10 +111,12 @@ func TestScoreGraphTotalsBeforeViewRefresh(t *testing.T) {
 	}
 	// A = 70 + 50 - 30 = 90, B = 70.
 
-	se.unrefreshedRounds.Store(1) // a refresh is still in flight
+	// Hold the view's refresh lock so the view stays at round 7 while rounds 8
+	// and 9 are stored.
+	hold := pg.Begin(t)
+	require.NoError(t, hold.Exec("REFRESH MATERIALIZED VIEW CONCURRENTLY cumulative_scores").Error)
 	processRound(se, 8, res(a.ID, "svc1", true), res(a.ID, "svc2", false), res(b.ID, "svc1", true))
 	processRound(se, 9, res(a.ID, "svc1", true), res(a.ID, "svc2", false), res(b.ID, "svc1", true))
-	se.unrefreshedRounds.Store(0)
 	// Round 9 adds a second SLA for A that the view does not cover yet.
 
 	scores, err := pg.DB.GetServiceCheckSumByRound()
@@ -123,7 +125,8 @@ func TestScoreGraphTotalsBeforeViewRefresh(t *testing.T) {
 	assert.Equal(t, 90, scores[6][a.ID])
 	assert.Equal(t, 70, scores[6][b.ID])
 
-	require.NoError(t, se.DB.RefreshScoresMaterializedView())
+	require.NoError(t, hold.Commit().Error)
+	waitScoresRefreshed(t, se)
 	scores, err = pg.DB.GetServiceCheckSumByRound()
 	require.NoError(t, err)
 	require.Len(t, scores, 9)
@@ -162,9 +165,8 @@ func TestScoresViewCatchesUpWithRoundStoredDuringRefresh(t *testing.T) {
 	processRound(se, 2, pass) // stored while round 1's refresh runs
 	require.NoError(t, hold.Commit().Error)
 
-	assert.Eventually(t, func() bool {
-		scores, err := pg.DB.GetServiceCheckSumByRound()
-		return assert.NoError(t, err) && len(scores) == 2
-	}, 10*time.Second, 50*time.Millisecond, "the view reaches round 2 without another round")
 	waitScoresRefreshed(t, se)
+	scores, err := pg.DB.GetServiceCheckSumByRound()
+	require.NoError(t, err)
+	assert.Len(t, scores, 2, "the view reaches round 2 without another round")
 }

@@ -43,8 +43,8 @@ type ScoringEngine struct {
 	roundListeners   map[chan struct{}]struct{}
 	DB               *db.DB
 
-	// Stored rounds that no finished cumulative_scores refresh is known to
-	// cover; 0 when no refresh runs. The round that raises it from 0 starts one.
+	// Stored rounds that no finished cumulative_scores refresh attempt started
+	// after; 0 when no refresh runs. The round that raises it from 0 starts one.
 	unrefreshedRounds atomic.Int64
 
 	// Config update handling
@@ -1013,7 +1013,8 @@ func (se *ScoringEngine) processCollectedResults(conf *config.ConfigSettings, re
 }
 
 // refreshScoresView refreshes cumulative_scores, again while rounds were stored
-// during the last refresh, so the view always reaches the last stored round.
+// during the last refresh. A failed refresh is logged and not retried; the next
+// stored round starts another.
 func (se *ScoringEngine) refreshScoresView() {
 	for {
 		stored := se.unrefreshedRounds.Load()

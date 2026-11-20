@@ -46,8 +46,8 @@ func (d *DB) GetServiceCheckSumByTeam() (map[uint]any, error) {
 // minus SLA penalties) after every round, indexed by round ID - 1. Points come
 // from the cumulative_scores view, and only penalties of rounds the view covers
 // are applied, so every total comes from the same refresh; rounds stored since
-// then appear after the next refresh. A team with no checks in a round (lost
-// round, all its checks disabled) keeps its previous total.
+// then appear after the next successful refresh. A team with no checks in a
+// round (lost round, all its checks disabled) keeps its previous total.
 func (d *DB) GetServiceCheckSumByRound() ([]map[uint]int, error) {
 	// Query from materialized view instead of running window function each time
 	pointRows, err := d.db.Raw(`
