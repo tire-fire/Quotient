@@ -299,7 +299,7 @@ func TestRvb_EnqueuesTasksAndCollectsResults(t *testing.T) {
 	}
 
 	fakeRunner(t, redis, nil)
-	err := engine.rvb()
+	err := engine.rvb(engine.Config.Current())
 
 	require.NoError(t, err)
 
@@ -371,7 +371,7 @@ func TestRvb_StopsOnResetPublishedToEngineRedis(t *testing.T) {
 		redis.Client.RPush(ctx, "results", result)
 	}()
 
-	err := engine.rvb()
+	err := engine.rvb(engine.Config.Current())
 	<-runnerDone
 	require.ErrorContains(t, err, "reset event received")
 }
@@ -415,7 +415,7 @@ func TestRvb_HandlesMultipleServices(t *testing.T) {
 		}
 		return results
 	})
-	err := engine.rvb()
+	err := engine.rvb(engine.Config.Current())
 
 	require.NoError(t, err)
 
@@ -580,7 +580,7 @@ func TestRvb_IgnoresStaleResultsFromRestartedRound(t *testing.T) {
 	require.NoError(t, redis.Client.RPush(ctx, "results", stale).Err())
 
 	fakeRunner(t, redis, nil)
-	err := engine.rvb()
+	err := engine.rvb(engine.Config.Current())
 	require.NoError(t, err)
 
 	round, err := pg.DB.GetLastRound()

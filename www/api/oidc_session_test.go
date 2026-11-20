@@ -98,3 +98,20 @@ func TestRedisErrorKeepsOIDCSession(t *testing.T) {
 	assert.False(t, ok)
 	assert.True(t, cleared, "a missing OIDC session still clears the cookie")
 }
+
+// The OIDC client is built once at startup. A reload that enables OIDC, or an
+// issuer that was down at startup, must leave the login and callback handlers
+// off instead of reaching for the missing client.
+func TestOIDCHandlersOffWithoutStartupClient(t *testing.T) {
+	a := NewAPI(config.NewLive(&config.ConfigSettings{OIDCSettings: config.OIDCAuthConfig{OIDCEnabled: true}}), &engine.ScoringEngine{})
+
+	rr := httptest.NewRecorder()
+	a.OIDCLoginHandler(rr, httptest.NewRequest(http.MethodGet, "/auth/oidc/login", nil))
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/oidc/callback?state=s1&code=c1", nil)
+	req.AddCookie(&http.Cookie{Name: "oidc_state", Value: "s1"})
+	rr = httptest.NewRecorder()
+	a.OIDCCallbackHandler(rr, req)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}

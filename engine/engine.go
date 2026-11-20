@@ -66,12 +66,11 @@ var errReset = errors.New("reset event received")
 
 
 func NewEngine(configPath string) *ScoringEngine {
-	// Ensure config is properly validated and runners are set up
-	live := &config.Live{}
-	if err := live.Reload(configPath); err != nil {
+	conf, err := config.Load(configPath)
+	if err != nil {
 		panic(fmt.Sprintf("Failed to validate initial config: %v", err))
 	}
-	conf := live.Current()
+	live := config.NewLive(conf)
 
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
@@ -176,9 +175,9 @@ func (se *ScoringEngine) Start() {
 				err = se.koth()
 			case "rvb":
 				if se.PreflightPending() {
-					err = se.preflight()
+					err = se.preflight(conf)
 				} else {
-					err = se.rvb()
+					err = se.rvb(conf)
 				}
 			default:
 				slog.Error("Unknown event type", "eventType", conf.RequiredSettings.EventType)
@@ -669,9 +668,8 @@ func (se *ScoringEngine) koth() error {
 }
 
 // perform a round of rvb
-func (se *ScoringEngine) rvb() error {
+func (se *ScoringEngine) rvb(conf *config.ConfigSettings) error {
 	slog.Info("Starting round", "round", se.CurrentRound)
-	conf := se.Config.Current()
 	results, err := se.runChecks(conf, se.CurrentRound, false)
 	if err != nil {
 		return err
@@ -709,14 +707,14 @@ func (se *ScoringEngine) PreflightPending() bool {
 
 // preflight runs the same checks as rvb but stores the results apart from
 // scoring.
-func (se *ScoringEngine) preflight() error {
+func (se *ScoringEngine) preflight(conf *config.ConfigSettings) error {
 	last, err := se.DB.GetLastPreflightRoundID()
 	if err != nil {
 		return err
 	}
 	round := db.PreflightRoundSchema{ID: last + 1, StartTime: se.CurrentRoundStartTime}
 	slog.Info("Starting preflight round", "preflight_round", round.ID)
-	results, err := se.runChecks(se.Config.Current(), round.ID, true)
+	results, err := se.runChecks(conf, round.ID, true)
 	if err != nil {
 		return err
 	}
@@ -741,7 +739,6 @@ func (se *ScoringEngine) preflight() error {
 	return nil
 }
 
-// runChecks enqueues the checks of conf, one config snapshot for the whole round.
 func (se *ScoringEngine) runChecks(conf *config.ConfigSettings, roundID uint, preflight bool) ([]checks.Result, error) {
 	// reassign the next round start time with jitter
 	// double the jitter and subtract it to get a random number between -jitter and jitter

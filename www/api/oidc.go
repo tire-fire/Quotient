@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dbaseqp/Quotient/engine/config"
+
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
@@ -115,7 +117,7 @@ func (a *API) InitOIDC() error {
 
 // OIDCLoginHandler initiates the OIDC authentication flow
 func (a *API) OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
-	if !a.conf.Current().OIDCSettings.OIDCEnabled {
+	if a.oidc == nil {
 		http.Error(w, "OIDC authentication is not enabled", http.StatusNotFound)
 		return
 	}
@@ -187,7 +189,7 @@ func (a *API) OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
 func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if !a.conf.Current().OIDCSettings.OIDCEnabled {
+	if a.oidc == nil {
 		http.Error(w, "OIDC authentication is not enabled", http.StatusNotFound)
 		return
 	}
@@ -289,7 +291,8 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract user info from claims
-	username, groups, roles := a.extractUserInfoFromClaims(&claims)
+	conf := a.conf.Current()
+	username, groups, roles := extractUserInfoFromClaims(conf, &claims)
 
 	if username == "" {
 		slog.Error("No username found in claims")
@@ -303,7 +306,7 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use role-based session expiration instead of access token expiry
-	expirySeconds := a.getRefreshTokenExpiry(roles)
+	expirySeconds := getRefreshTokenExpiry(conf, roles)
 	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
 
 	// Store refresh token if available
@@ -327,8 +330,6 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookieMaxAge := a.getRefreshTokenExpiry(roles)
-
 	// Set session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     COOKIENAME,
@@ -337,7 +338,7 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   a.cookieSecure(),
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   cookieMaxAge,
+		MaxAge:   expirySeconds,
 	})
 
 	slog.Info("OIDC authentication successful", "username", username, "roles", roles)
@@ -367,7 +368,7 @@ func (a *API) OIDCLogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if provider supports end session endpoint
 	var endSessionURL string
-	if a.conf.Current().OIDCSettings.OIDCEnabled && a.oidc.oidcProvider != nil {
+	if a.oidc != nil {
 		// Try to get end session endpoint from provider metadata
 		var claims struct {
 			EndSessionEndpoint string `json:"end_session_endpoint"`
@@ -386,8 +387,7 @@ func (a *API) OIDCLogoutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *API) mapGroupsToRoles(groups []string) []string {
-	conf := a.conf.Current()
+func mapGroupsToRoles(conf *config.ConfigSettings, groups []string) []string {
 	var roles []string
 
 	// Check admin groups
@@ -441,8 +441,7 @@ func matchesGroup(userGroups []string, configGroup string) bool {
 	return slices.Contains(userGroups, configGroup)
 }
 
-func (a *API) getRefreshTokenExpiry(roles []string) int {
-	conf := a.conf.Current()
+func getRefreshTokenExpiry(conf *config.ConfigSettings, roles []string) int {
 	defaultExpiry := 86400 // 24 hours in seconds
 
 	if slices.Contains(roles, "admin") {
@@ -608,14 +607,15 @@ func (a *API) tryRefreshOIDCSession(username string, oldInfo *OidcUserInfo) bool
 	}
 
 	// Extract user info from new claims
-	newUsername, groups, roles := a.extractUserInfoFromClaims(&claims)
+	conf := a.conf.Current()
+	newUsername, groups, roles := extractUserInfoFromClaims(conf, &claims)
 	if newUsername != username {
 		slog.Error("Username mismatch after refresh", "expected", username, "got", newUsername)
 		return false
 	}
 
 	// Calculate new expiration
-	expirySeconds := a.getRefreshTokenExpiry(roles)
+	expirySeconds := getRefreshTokenExpiry(conf, roles)
 	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
 
 	// Store the refreshed session
@@ -631,7 +631,7 @@ func (a *API) tryRefreshOIDCSession(username string, oldInfo *OidcUserInfo) bool
 }
 
 // extractUserInfoFromClaims extracts username, groups, and roles from OIDC claims
-func (a *API) extractUserInfoFromClaims(claims *IDTokenClaims) (username string, groups []string, roles []string) {
+func extractUserInfoFromClaims(conf *config.ConfigSettings, claims *IDTokenClaims) (username string, groups []string, roles []string) {
 	// Extract username
 	username = claims.PreferredUsername
 	// The username keys the session, so an email nobody verified must not
@@ -643,10 +643,8 @@ func (a *API) extractUserInfoFromClaims(claims *IDTokenClaims) (username string,
 		username = claims.Subject
 	}
 
-	// Extract groups based on configured claim. One snapshot serves both settings, so a reload
-	// cannot pair the claim location from one config with the client id from another.
-	oidcCfg := a.conf.Current().OIDCSettings
-	groupClaim := oidcCfg.OIDCGroupClaim
+	// Extract groups based on configured claim
+	groupClaim := conf.OIDCSettings.OIDCGroupClaim
 	if groupClaim == "" {
 		groupClaim = "groups"
 	}
@@ -660,7 +658,7 @@ func (a *API) extractUserInfoFromClaims(claims *IDTokenClaims) (username string,
 		groups = claims.RealmAccess.Roles
 	case "resource_access.roles":
 		// Client roles live under the client this deployment logs in as.
-		groups = claims.ResourceAccess[oidcCfg.OIDCClientID].Roles
+		groups = claims.ResourceAccess[conf.OIDCSettings.OIDCClientID].Roles
 	default:
 		// Unsupported group claim location
 		slog.Warn("Unsupported OIDCGroupClaim value", "claim", groupClaim)
@@ -668,7 +666,7 @@ func (a *API) extractUserInfoFromClaims(claims *IDTokenClaims) (username string,
 	}
 
 	// Map groups to roles
-	roles = a.mapGroupsToRoles(groups)
+	roles = mapGroupsToRoles(conf, groups)
 
 	return username, groups, roles
 }
@@ -696,10 +694,11 @@ func (a *API) FetchUserInfoFromProvider(accessToken string) (*OidcUserInfo, erro
 	}
 
 	// Extract user info using common function
-	username, groups, roles := a.extractUserInfoFromClaims(&claims)
+	conf := a.conf.Current()
+	username, groups, roles := extractUserInfoFromClaims(conf, &claims)
 
 	// Store in cache for future use with default expiration
-	expirySeconds := a.getRefreshTokenExpiry(roles)
+	expirySeconds := getRefreshTokenExpiry(conf, roles)
 	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
 	a.storeOIDCUserInfo(username, groups, roles, expiresAt, "")
 
@@ -749,7 +748,8 @@ func (a *API) ValidateOIDCToken(token string) (map[string]interface{}, error) {
 
 	// Extract groups using same logic as callback
 	var groups []string
-	groupClaim := a.conf.Current().OIDCSettings.OIDCGroupClaim
+	conf := a.conf.Current()
+	groupClaim := conf.OIDCSettings.OIDCGroupClaim
 	if groupClaim == "" {
 		groupClaim = "groups"
 	}
@@ -767,7 +767,7 @@ func (a *API) ValidateOIDCToken(token string) (map[string]interface{}, error) {
 		groups = []string{}
 	}
 
-	roles := a.mapGroupsToRoles(groups)
+	roles := mapGroupsToRoles(conf, groups)
 	if len(roles) == 0 {
 		return nil, errors.New("user has no authorized roles")
 	}

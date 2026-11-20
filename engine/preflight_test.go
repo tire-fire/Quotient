@@ -110,8 +110,8 @@ func TestPreflight_StoresResultsApartFromScoring(t *testing.T) {
 		return passResult(task)
 	})
 	se.CurrentRoundStartTime = time.Now().Truncate(time.Microsecond)
-	require.NoError(t, se.preflight())
-	require.NoError(t, se.preflight())
+	require.NoError(t, se.preflight(se.Config.Current()))
+	require.NoError(t, se.preflight(se.Config.Current()))
 
 	for range 2 {
 		select {
@@ -167,7 +167,7 @@ func TestPreflight_IgnoresScoredRoundResults(t *testing.T) {
 		}
 		return append([]checks.Result{scored}, passResult(task)...)
 	})
-	require.NoError(t, se.preflight())
+	require.NoError(t, se.preflight(se.Config.Current()))
 
 	_, rows := teamPreflight(t, pg, team.ID)
 	require.Len(t, rows, 1)
@@ -188,7 +188,7 @@ func TestPreflight_StoresRoundWithoutResults(t *testing.T) {
 	se.Config.Current().MiscSettings.Delay = 2
 
 	// No runner answers, so the round times out with nothing collected.
-	require.NoError(t, se.preflight())
+	require.NoError(t, se.preflight(se.Config.Current()))
 
 	round, err := pg.DB.GetLatestPreflightRound()
 	require.NoError(t, err)
@@ -277,12 +277,12 @@ func TestResetScores_ReentersPreflight(t *testing.T) {
 	se := newPreflightEngine(t, redis, pg)
 
 	fakeRunner(t, redis, nil)
-	require.NoError(t, se.preflight())
+	require.NoError(t, se.preflight(se.Config.Current()))
 	require.NoError(t, pg.DB.SetCompetitionStarted(true))
 	startedAt, err := pg.DB.GetCompetitionStart()
 	require.NoError(t, err)
 	require.NotNil(t, startedAt)
-	require.NoError(t, se.rvb())
+	require.NoError(t, se.rvb(se.Config.Current()))
 	assert.False(t, se.PreflightPending())
 
 	require.NoError(t, pg.DB.SetCompetitionStarted(false))

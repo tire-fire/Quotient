@@ -22,8 +22,8 @@ BindAddress = "0.0.0.0:8080"
 ` + misc
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
-	var conf ConfigSettings
-	require.NoError(t, conf.SetConfig(path))
+	conf, err := Load(path)
+	require.NoError(t, err)
 	return conf.MiscSettings
 }
 

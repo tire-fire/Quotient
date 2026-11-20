@@ -239,7 +239,7 @@ func (a *API) auth(username string, password string) (map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(a.ldapGroupRoles(groups)) == 0 {
+		if len(ldapGroupRoles(conf, groups)) == 0 {
 			return nil, errors.New("LDAP user has no authorized roles")
 		}
 		return map[string]any{"username": username, "authSource": "ldap"}, nil

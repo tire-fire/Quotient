@@ -246,20 +246,20 @@ type Box struct {
 	WinRM  []*checks.WinRM  `toml:"Winrm,omitempty" json:"winrm,omitempty"`
 }
 
-// Load in a config. conf must not be shared yet: reloads go through Live.Reload.
-func (conf *ConfigSettings) SetConfig(path string) error {
+// Load reads and validates the config at path and returns it as a new snapshot.
+func Load(path string) (*ConfigSettings, error) {
 	slog.Info("Loading configuration file", "path", path)
 
-	tempConf := ConfigSettings{}
+	conf := &ConfigSettings{}
 	fileContent, err := os.ReadFile(path) // #nosec G304 -- path is admin-controlled config file location
 	if err != nil {
-		return fmt.Errorf("configuration file (%s) not found: %w", path, err)
+		return nil, fmt.Errorf("configuration file (%s) not found: %w", path, err)
 	}
 
 	slog.Debug("Decoding TOML configuration")
-	md, err := toml.Decode(string(fileContent), &tempConf)
+	md, err := toml.Decode(string(fileContent), conf)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, undecoded := range md.Undecoded() {
@@ -267,21 +267,18 @@ func (conf *ConfigSettings) SetConfig(path string) error {
 	}
 
 	// Log box count
-	slog.Debug("Configuration state", "boxes", len(tempConf.Box))
+	slog.Debug("Configuration state", "boxes", len(conf.Box))
 
 	// check the configuration and set defaults
-	if err := checkConfig(&tempConf); err != nil {
-		return fmt.Errorf("configuration file ("+path+") is invalid:", err)
+	if err := checkConfig(conf); err != nil {
+		return nil, fmt.Errorf("configuration file ("+path+") is invalid:", err)
 	}
-
-	// if we're here, the config is valid
-	*conf = tempConf
 
 	slog.Info("Configuration loaded successfully",
 		"boxes", len(conf.Box),
 		"total_runners", len(conf.AllChecks()))
 
-	return nil
+	return conf, nil
 }
 
 func checkConfig(conf *ConfigSettings) error {

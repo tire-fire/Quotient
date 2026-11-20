@@ -233,21 +233,21 @@ func TestCallerRoles(t *testing.T) {
 }
 
 func TestLdapGroupRoles(t *testing.T) {
-	a := &API{conf: config.NewLive(&config.ConfigSettings{
+	conf := &config.ConfigSettings{
 		LdapSettings: config.LdapAuthConfig{
 			LdapAdminGroupDn:  "CN=Admins,DC=example,DC=com",
 			LdapRedGroupDn:    "CN=Red,DC=example,DC=com",
 			LdapTeamGroupDn:   "CN=Teams,DC=example,DC=com",
 			LdapInjectGroupDn: "CN=Injects,DC=example,DC=com",
 		},
-	})}
+	}
 
-	assert.Equal(t, []string{"team"}, a.ldapGroupRoles([]string{"CN=Other,DC=example,DC=com", "CN=Teams,DC=example,DC=com"}))
-	assert.Equal(t, []string{"admin", "inject"}, a.ldapGroupRoles([]string{"CN=Admins,DC=example,DC=com", "CN=Injects,DC=example,DC=com"}))
-	assert.Empty(t, a.ldapGroupRoles([]string{"cn=teams,dc=example,dc=com"}), "group DNs must match exactly")
-	assert.Empty(t, a.ldapGroupRoles(nil))
+	assert.Equal(t, []string{"team"}, ldapGroupRoles(conf, []string{"CN=Other,DC=example,DC=com", "CN=Teams,DC=example,DC=com"}))
+	assert.Equal(t, []string{"admin", "inject"}, ldapGroupRoles(conf, []string{"CN=Admins,DC=example,DC=com", "CN=Injects,DC=example,DC=com"}))
+	assert.Empty(t, ldapGroupRoles(conf, []string{"cn=teams,dc=example,dc=com"}), "group DNs must match exactly")
+	assert.Empty(t, ldapGroupRoles(conf, nil))
 
-	a.conf.Current().LdapSettings.LdapRedGroupDn = a.conf.Current().LdapSettings.LdapAdminGroupDn
-	assert.Equal(t, []string{"admin", "red"}, a.ldapGroupRoles([]string{"CN=Admins,DC=example,DC=com"}),
+	conf.LdapSettings.LdapRedGroupDn = conf.LdapSettings.LdapAdminGroupDn
+	assert.Equal(t, []string{"admin", "red"}, ldapGroupRoles(conf, []string{"CN=Admins,DC=example,DC=com"}),
 		"one group may grant several roles")
 }

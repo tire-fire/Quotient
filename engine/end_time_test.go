@@ -271,7 +271,7 @@ func TestPauseAtCompetitionEnd(t *testing.T) {
 		se := newEngine(t, at(-2*time.Hour))
 		require.True(t, boundary(t, se))
 
-		se.Config.Current().InjectSettings.End = at(-time.Hour) // an event.conf hot-reload
+		se.Config.Current().InjectSettings.End = at(-time.Hour)
 		require.True(t, se.SetPaused(false))
 		assert.Nil(t, overtime(t), "overtime is recorded only for the end that is still in effect")
 		assert.True(t, boundary(t, se))

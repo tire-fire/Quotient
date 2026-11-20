@@ -25,8 +25,8 @@ func (l *Live) Current() *ConfigSettings {
 // Reload loads and validates the config at path and publishes it. On error the
 // current snapshot stays in place.
 func (l *Live) Reload(path string) error {
-	next := &ConfigSettings{}
-	if err := next.SetConfig(path); err != nil {
+	next, err := Load(path)
+	if err != nil {
 		return err
 	}
 	l.cur.Store(next)

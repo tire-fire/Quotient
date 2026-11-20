@@ -66,7 +66,7 @@ Jitter = 1
 	}()
 	rounds := 0
 	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); rounds++ {
-		require.NoError(t, se.rvb())
+		require.NoError(t, se.rvb(se.Config.Current()))
 	}
 	close(stop)
 	t.Logf("rounds=%d reloads=%d", rounds, <-reloads)

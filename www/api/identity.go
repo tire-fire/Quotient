@@ -207,9 +207,9 @@ func teamOrdinal(name string) (uint64, bool) {
 
 // isTeamGroup reports whether a group is covered by an OIDCTeamGroups pattern,
 // by the same rule that grants the team role in mapGroupsToRoles.
-func (a *API) isTeamGroup(group string) bool {
+func isTeamGroup(conf *config.ConfigSettings, group string) bool {
 	one := []string{group}
-	return slices.ContainsFunc(a.conf.Current().OIDCSettings.OIDCTeamGroups, func(pattern string) bool {
+	return slices.ContainsFunc(conf.OIDCSettings.OIDCTeamGroups, func(pattern string) bool {
 		return matchesGroup(one, pattern)
 	})
 }
@@ -218,10 +218,11 @@ func (a *API) isTeamGroup(group string) bool {
 // see "How OIDC users are placed on a team" in README.md for the two passes.
 // Returns nil when nothing matches, which every caller must handle.
 func (a *API) mapOIDCUserToTeam(teams []db.TeamSchema, userGroups []string) *db.TeamSchema {
+	conf := a.conf.Current()
 	// Pass 1: the group is named after the team. The first group that names a
 	// team wins; this pass does not look for a second.
 	for _, group := range userGroups {
-		if !a.isTeamGroup(group) {
+		if !isTeamGroup(conf, group) {
 			continue
 		}
 		for i := range teams {
@@ -235,7 +236,7 @@ func (a *API) mapOIDCUserToTeam(teams []db.TeamSchema, userGroups []string) *db.
 	// than one team resolves to nil rather than a guess.
 	var groupOrdinals []uint64
 	for _, group := range userGroups {
-		if !a.isTeamGroup(group) {
+		if !isTeamGroup(conf, group) {
 			continue
 		}
 		if ordinal, ok := teamOrdinal(group); ok {
@@ -256,7 +257,7 @@ func (a *API) mapOIDCUserToTeam(teams []db.TeamSchema, userGroups []string) *db.
 		return &matched[0]
 	case 0:
 		slog.Warn("no team matched any of the user's groups",
-			"groups", userGroups, "team_groups", a.conf.Current().OIDCSettings.OIDCTeamGroups)
+			"groups", userGroups, "team_groups", conf.OIDCSettings.OIDCTeamGroups)
 	default:
 		names := make([]string, 0, len(matched))
 		for _, t := range matched {
@@ -307,7 +308,7 @@ func (a *API) ldapRoles(username string) ([]string, error) {
 		return nil, err
 	}
 
-	roles := a.ldapGroupRoles(groups)
+	roles := ldapGroupRoles(conf, groups)
 	if len(roles) == 0 {
 		return nil, errors.New("LDAP user has no authorized roles")
 	}
@@ -315,8 +316,7 @@ func (a *API) ldapRoles(username string) ([]string, error) {
 }
 
 // ldapGroupRoles maps LDAP group DNs to the roles they grant.
-func (a *API) ldapGroupRoles(groups []string) []string {
-	conf := a.conf.Current()
+func ldapGroupRoles(conf *config.ConfigSettings, groups []string) []string {
 	roles := make([]string, 0)
 	for _, group := range groups {
 		if group == conf.LdapSettings.LdapAdminGroupDn {
