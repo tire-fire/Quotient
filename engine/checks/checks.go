@@ -202,19 +202,19 @@ func (service *Service) Run(teamID uint, teamIdentifier string, roundID uint, re
 	slog.Debug("Running check", "teamID", teamID, "serviceName", service.Name, "target", service.Target)
 	response := make(chan Result, 1)
 
-	// A check library that panics on a malformed reply from a team's server
-	// must fail that check, not kill the runner and every task it holds.
+	// A panic in the check goroutine fails that check instead of killing the
+	// runner. Panics in goroutines a check library starts itself (go-smb2's
+	// receiver, for one) are not caught here.
 	// checkResult is passed by value: Run writes it on timeout while the
 	// definition may still be running.
 	go func(initial Result) {
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("check panicked", "service", initial.ServiceName, "team", teamID, "panic", r)
-				failed := initial
-				failed.Error = "check crashed on the service's response"
-				failed.Debug = fmt.Sprint(r)
+				initial.Error = "check crashed on the service's response"
+				initial.Debug = fmt.Sprint(r)
 				select {
-				case response <- failed:
+				case response <- initial:
 				default:
 				}
 			}
