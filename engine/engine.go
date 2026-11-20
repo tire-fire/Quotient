@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -142,6 +143,7 @@ func (se *ScoringEngine) Start() {
 
 	se.NextRoundStartTime = time.Time{}
 	se.pausedAtEnd = nil
+	divisorRotation := divisorRotationTime(os.Getenv("NUM_IPS"))
 
 	stop := make(chan struct{})
 	loopDone := make(chan struct{})
@@ -191,11 +193,7 @@ func (se *ScoringEngine) Start() {
 			}
 			slog.Error("Round error, retrying next round", "error", err)
 		}
-		// Divisor rotates the runners' source addresses when it sees round_finish. A round that ran to
-		// its deadline (a lost or late result) would otherwise start the next round at once, while the
-		// rotation removes the address the new round's first checks connect from, and those checks
-		// time out against services that are up.
-		if earliest := time.Now().Add(roundFinishSettle); se.NextRoundStartTime.Before(earliest) {
+		if earliest := time.Now().Add(divisorRotation); se.NextRoundStartTime.Before(earliest) {
 			se.NextRoundStartTime = earliest
 		}
 
@@ -208,10 +206,22 @@ func (se *ScoringEngine) Start() {
 	slog.Info("Restarting scoring...")
 }
 
-// roundFinishSettle is the least time between a round_finish and the next round's start. Divisor
-// rotates runner source addresses on round_finish (about 1 s per address it probes, NUM_IPS of them),
-// so this only delays the round after one that ran to its deadline.
-const roundFinishSettle = 5 * time.Second
+// divisorRotationTime is the least gap between a round returning and the next round's start, so the
+// next round's checks don't run while Divisor rotates the runners' source addresses on round_finish.
+// Divisor reads NUM_IPS from the .env it shares with the engine. It removes the old addresses, then
+// pings a candidate for each new one with a 1 s timeout, and rewrites the SNAT rules last, so the
+// rotation takes at least NUM_IPS seconds. Without a positive NUM_IPS there is no rotation to wait for.
+func divisorRotationTime(numIPs string) time.Duration {
+	n, err := strconv.Atoi(numIPs)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return time.Duration(n)*time.Second + divisorRotationMargin
+}
+
+// divisorRotationMargin covers Divisor's retries on candidates that answer the ping and its Docker
+// and iptables calls.
+const divisorRotationMargin = 2 * time.Second
 
 func (se *ScoringEngine) waitForReset() {
 	// wait for a signal to reset the engine
