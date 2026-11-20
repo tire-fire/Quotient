@@ -3,8 +3,10 @@ package checks
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,23 +24,33 @@ type DnsRecord struct {
 	Answer []string
 }
 
+// dnsKinds maps each supported record kind to its query type and answer
+// matcher. A matcher accepts only answers of its own kind: the team's server
+// chooses the answer type.
+var dnsKinds = map[string]struct {
+	qtype   uint16
+	matches func(answer dns.RR, expected string) bool
+}{
+	"A": {dns.TypeA, func(answer dns.RR, expected string) bool {
+		rr, ok := answer.(*dns.A)
+		return ok && rr.A.String() == expected
+	}},
+	"MX": {dns.TypeMX, func(answer dns.RR, expected string) bool {
+		rr, ok := answer.(*dns.MX)
+		return ok && strings.EqualFold(rr.Mx, dns.Fqdn(expected))
+	}},
+}
+
 func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan chan Result) {
 	definition := func(teamID uint, teamIdentifier string, checkResult Result, response chan Result) {
 		// Pick a record
 		record := c.Record[rand.Intn(len(c.Record))] // #nosec G404 -- non-crypto selection of DNS record to test
+		kind := dnsKinds[record.Kind]
 		fqdn := dns.Fqdn(strings.ReplaceAll(dns.Fqdn(record.Domain), "_", teamIdentifier))
 
 		// Setup for dns query
 		var msg dns.Msg
-
-		// switch of kind of record (A, MX, etc)
-		// TODO: add more values
-		switch record.Kind {
-		case "A":
-			msg.SetQuestion(fqdn, dns.TypeA)
-		case "MX":
-			msg.SetQuestion(fqdn, dns.TypeMX)
-		}
+		msg.SetQuestion(fqdn, kind.qtype)
 
 		// Make it obey timeout via deadline
 		// deadctx, cancel := context.WithTimeout(context.TODO(), time.Duration(2)*time.Second)
@@ -73,12 +85,10 @@ func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
-		// Loop through results and check for correct match
 		for _, answer := range in.Answer {
-			// Check if an answer matches an expected value for its record type
 			for _, expectedAnswer := range record.Answer {
 				expectedAnswer = strings.ReplaceAll(expectedAnswer, "_", teamIdentifier)
-				if dnsAnswerMatches(answer, expectedAnswer) {
+				if kind.matches(answer, expectedAnswer) {
 					checkResult.Status = true
 					checkResult.Debug = fmt.Sprintf("record %s returned %s. acceptable answers were: %v", record.Domain, expectedAnswer, record.Answer)
 					response <- checkResult
@@ -87,25 +97,13 @@ func (c Dns) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			}
 		}
 
-		// If we reach here no records matched expected IP and check fails
+		// If we reach here no answer matched an expected value and check fails
 		checkResult.Error = "incorrect answer(s) received from DNS"
 		checkResult.Debug = "record " + record.Domain + "-> acceptable answers were: " + fmt.Sprint(record.Answer) + ", received " + fmt.Sprint(in.Answer)
 		response <- checkResult
 	}
 
 	c.Service.Run(teamID, teamIdentifier, roundID, resultsChan, definition)
-}
-
-// dnsAnswerMatches compares an A answer's address, or an MX answer's mail
-// exchanger (case-insensitively, as a fully qualified name), to expected.
-func dnsAnswerMatches(answer dns.RR, expected string) bool {
-	switch rr := answer.(type) {
-	case *dns.A:
-		return rr.A.String() == expected
-	case *dns.MX:
-		return strings.EqualFold(rr.Mx, dns.Fqdn(expected))
-	}
-	return false
 }
 
 func (c *Dns) Verify(box string, ip string, points int, timeout int, slapenalty int, slathreshold int) error {
@@ -128,8 +126,9 @@ func (c *Dns) Verify(box string, ip string, points int, timeout int, slapenalty 
 		c.Name = box + "-" + c.Display
 	}
 	for _, record := range c.Record {
-		if record.Kind != "A" && record.Kind != "MX" {
-			return fmt.Errorf("dns check %s: unsupported record kind %q (supported: A, MX)", c.Name, record.Kind)
+		if _, ok := dnsKinds[record.Kind]; !ok {
+			return fmt.Errorf("dns check %s: unsupported record kind %q (supported: %s)",
+				c.Name, record.Kind, strings.Join(slices.Sorted(maps.Keys(dnsKinds)), ", "))
 		}
 	}
 
