@@ -51,7 +51,9 @@ func (router *Router) pageData(r *http.Request, unique map[string]any) map[strin
 		data["roles"] = id.Roles
 	}
 	data["name"] = "QUOTIENT"
-	data["config"] = router.Config.Current()
+	conf := router.Config.Current()
+	data["config"] = conf
+	data["oidcLogin"] = router.api.OIDCLoginEnabled(conf)
 	data["error"] = ""
 	data["path"] = r.URL.Path
 

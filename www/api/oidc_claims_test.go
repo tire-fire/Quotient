@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// "resource_access.roles" must read the roles of this deployment's client, not
-// the realm roles: a realm role named like an admin group must not grant admin.
+// "resource_access.roles" must read the roles of the client that verified the
+// token, not the realm roles: a realm role named like an admin group must not
+// grant admin. A reload that changes OIDCClientID does not change that client.
 func TestOIDCResourceAccessClaimReadsClientRoles(t *testing.T) {
 	conf := &config.ConfigSettings{OIDCSettings: config.OIDCAuthConfig{
 		OIDCEnabled:     true,
-		OIDCClientID:    "quotient",
+		OIDCClientID:    "other",
 		OIDCGroupClaim:  "resource_access.roles",
 		OIDCAdminGroups: []string{"quotient-admin"},
 		OIDCTeamGroups:  []string{"team*"},
@@ -29,7 +30,7 @@ func TestOIDCResourceAccessClaimReadsClientRoles(t *testing.T) {
 		"other":    {Roles: []string{"quotient-admin"}},
 	}
 
-	username, groups, roles := extractUserInfoFromClaims(conf, &claims)
+	username, groups, roles := extractUserInfoFromClaims(conf, "quotient", &claims)
 	assert.Equal(t, "blue1", username)
 	assert.Equal(t, []string{"team01"}, groups)
 	assert.Equal(t, []string{"team"}, roles)

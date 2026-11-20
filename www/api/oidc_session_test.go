@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 // fakeRedis answers GET from sessions, or fails every command while down.
@@ -99,19 +100,33 @@ func TestRedisErrorKeepsOIDCSession(t *testing.T) {
 	assert.True(t, cleared, "a missing OIDC session still clears the cookie")
 }
 
-// The OIDC client is built once at startup. A reload that enables OIDC, or an
-// issuer that was down at startup, must leave the login and callback handlers
-// off instead of reaching for the missing client.
+// A reload that enables OIDC, or an issuer down at startup, leaves a.oidc nil;
+// login and callback must 404.
 func TestOIDCHandlersOffWithoutStartupClient(t *testing.T) {
 	a := NewAPI(config.NewLive(&config.ConfigSettings{OIDCSettings: config.OIDCAuthConfig{OIDCEnabled: true}}), &engine.ScoringEngine{})
+	assertOIDCHandlersOff(t, a)
+}
 
+// A reload that disables OIDC must stop new sign-ins although the client built
+// at startup still exists.
+func TestOIDCHandlersOffWhenReloadDisablesOIDC(t *testing.T) {
+	a := NewAPI(config.NewLive(&config.ConfigSettings{}), &engine.ScoringEngine{})
+	a.oidc = &oidcState{
+		oauth2Config: &oauth2.Config{ClientID: "quotient"},
+		oidcSessions: map[string]*oidcSession{"s1": {State: "s1"}},
+	}
+	assertOIDCHandlersOff(t, a)
+}
+
+func assertOIDCHandlersOff(t *testing.T, a *API) {
+	t.Helper()
 	rr := httptest.NewRecorder()
 	a.OIDCLoginHandler(rr, httptest.NewRequest(http.MethodGet, "/auth/oidc/login", nil))
-	assert.Equal(t, http.StatusNotFound, rr.Code)
+	assert.Equal(t, http.StatusNotFound, rr.Code, "login")
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/oidc/callback?state=s1&code=c1", nil)
 	req.AddCookie(&http.Cookie{Name: "oidc_state", Value: "s1"})
 	rr = httptest.NewRecorder()
 	a.OIDCCallbackHandler(rr, req)
-	assert.Equal(t, http.StatusNotFound, rr.Code)
+	assert.Equal(t, http.StatusNotFound, rr.Code, "callback")
 }

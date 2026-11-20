@@ -34,7 +34,7 @@
                     <button type="submit" class="btn w-100 btn-primary">Submit</button>
                 </form>
                 {{ end }}
-                {{ if .config.OIDCSettings.OIDCEnabled }}
+                {{ if .oidcLogin }}
                 {{ if not .config.OIDCSettings.OIDCDisableLocalLogin }}
                 <div class="text-center my-3">
                     <div class="text-muted mb-2">— OR —</div>

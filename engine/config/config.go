@@ -266,7 +266,6 @@ func Load(path string) (*ConfigSettings, error) {
 		slog.Warn("undecoded configuration key \"" + undecoded.String() + "\" will not be used.")
 	}
 
-	// Log box count
 	slog.Debug("Configuration state", "boxes", len(conf.Box))
 
 	// check the configuration and set defaults

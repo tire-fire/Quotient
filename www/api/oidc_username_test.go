@@ -16,10 +16,10 @@ func TestOIDCUsernameUsesOnlyVerifiedEmail(t *testing.T) {
 	}}
 
 	claims := IDTokenClaims{Subject: "sub-123", Email: "admin@event.example", Groups: []string{"team05"}}
-	username, _, _ := extractUserInfoFromClaims(conf, &claims)
+	username, _, _ := extractUserInfoFromClaims(conf, "quotient", &claims)
 	assert.Equal(t, "sub-123", username, "an unverified email falls through to sub")
 
 	claims.EmailVerified = true
-	username, _, _ = extractUserInfoFromClaims(conf, &claims)
+	username, _, _ = extractUserInfoFromClaims(conf, "quotient", &claims)
 	assert.Equal(t, "admin@event.example", username)
 }

@@ -458,7 +458,7 @@ func TestCompetitionSchedule_OverrideAndAutoStart(t *testing.T) {
 		t.Cleanup(func() { close(stop) })
 		ready := make(chan bool, 1)
 		go func() {
-			_, ok := se.waitForRoundReady(stop)
+			_, _, ok := se.waitForRoundReady(stop)
 			ready <- ok
 		}()
 		return ready

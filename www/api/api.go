@@ -20,8 +20,8 @@ import (
 type API struct {
 	conf *config.Live
 	eng  *engine.ScoringEngine
-	// oidc is built once at startup and is nil unless OIDC came up, so it, not
-	// the reloadable config, decides whether the OIDC handlers serve.
+	// oidc is built once at startup and is nil unless OIDC came up then;
+	// OIDCLoginEnabled requires it as well as the live OIDCEnabled.
 	oidc *oidcState
 }
 

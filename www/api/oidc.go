@@ -23,7 +23,6 @@ import (
 )
 
 type oidcState struct {
-	oidcProvider *oidc.Provider
 	oauth2Config *oauth2.Config
 	oidcVerifier *oidc.IDTokenVerifier
 
@@ -99,7 +98,6 @@ func (a *API) InitOIDC() error {
 	})
 
 	a.oidc = &oidcState{
-		oidcProvider: provider,
 		oauth2Config: oauth2Config,
 		oidcVerifier: oidcVerifier,
 		oidcSessions: make(map[string]*oidcSession),
@@ -115,9 +113,15 @@ func (a *API) InitOIDC() error {
 	return nil
 }
 
+// OIDCLoginEnabled reports whether OIDC sign-in is on: conf enables it and the
+// OIDC client came up at startup.
+func (a *API) OIDCLoginEnabled(conf *config.ConfigSettings) bool {
+	return a.oidc != nil && conf.OIDCSettings.OIDCEnabled
+}
+
 // OIDCLoginHandler initiates the OIDC authentication flow
 func (a *API) OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
-	if a.oidc == nil {
+	if !a.OIDCLoginEnabled(a.conf.Current()) {
 		http.Error(w, "OIDC authentication is not enabled", http.StatusNotFound)
 		return
 	}
@@ -189,7 +193,8 @@ func (a *API) OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
 func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if a.oidc == nil {
+	conf := a.conf.Current()
+	if !a.OIDCLoginEnabled(conf) {
 		http.Error(w, "OIDC authentication is not enabled", http.StatusNotFound)
 		return
 	}
@@ -290,9 +295,7 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract user info from claims
-	conf := a.conf.Current()
-	username, groups, roles := extractUserInfoFromClaims(conf, &claims)
+	username, groups, roles := extractUserInfoFromClaims(conf, a.oidc.oauth2Config.ClientID, &claims)
 
 	if username == "" {
 		slog.Error("No username found in claims")
@@ -350,41 +353,6 @@ func (a *API) OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-}
-
-// OIDCLogoutHandler handles OIDC logout
-func (a *API) OIDCLogoutHandler(w http.ResponseWriter, r *http.Request) {
-
-	// Clear session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     COOKIENAME,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   a.cookieSecure(),
-		SameSite: http.SameSiteStrictMode,
-	})
-
-	// Check if provider supports end session endpoint
-	var endSessionURL string
-	if a.oidc != nil {
-		// Try to get end session endpoint from provider metadata
-		var claims struct {
-			EndSessionEndpoint string `json:"end_session_endpoint"`
-		}
-		if err := a.oidc.oidcProvider.Claims(&claims); err == nil && claims.EndSessionEndpoint != "" {
-			endSessionURL = claims.EndSessionEndpoint
-		}
-	}
-
-	if endSessionURL != "" {
-		// Redirect to provider's logout endpoint
-		http.Redirect(w, r, endSessionURL, http.StatusFound)
-	} else {
-		// Redirect to login page
-		http.Redirect(w, r, "/auth", http.StatusFound)
-	}
 }
 
 func mapGroupsToRoles(conf *config.ConfigSettings, groups []string) []string {
@@ -606,15 +574,13 @@ func (a *API) tryRefreshOIDCSession(username string, oldInfo *OidcUserInfo) bool
 		return false
 	}
 
-	// Extract user info from new claims
 	conf := a.conf.Current()
-	newUsername, groups, roles := extractUserInfoFromClaims(conf, &claims)
+	newUsername, groups, roles := extractUserInfoFromClaims(conf, a.oidc.oauth2Config.ClientID, &claims)
 	if newUsername != username {
 		slog.Error("Username mismatch after refresh", "expected", username, "got", newUsername)
 		return false
 	}
 
-	// Calculate new expiration
 	expirySeconds := getRefreshTokenExpiry(conf, roles)
 	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
 
@@ -630,8 +596,9 @@ func (a *API) tryRefreshOIDCSession(username string, oldInfo *OidcUserInfo) bool
 	return true
 }
 
-// extractUserInfoFromClaims extracts username, groups, and roles from OIDC claims
-func extractUserInfoFromClaims(conf *config.ConfigSettings, claims *IDTokenClaims) (username string, groups []string, roles []string) {
+// extractUserInfoFromClaims extracts username, groups, and roles from OIDC
+// claims. clientID is the client that verified the token.
+func extractUserInfoFromClaims(conf *config.ConfigSettings, clientID string, claims *IDTokenClaims) (username string, groups []string, roles []string) {
 	// Extract username
 	username = claims.PreferredUsername
 	// The username keys the session, so an email nobody verified must not
@@ -657,127 +624,18 @@ func extractUserInfoFromClaims(conf *config.ConfigSettings, claims *IDTokenClaim
 	case "realm_access.roles":
 		groups = claims.RealmAccess.Roles
 	case "resource_access.roles":
-		// Client roles live under the client this deployment logs in as.
-		groups = claims.ResourceAccess[conf.OIDCSettings.OIDCClientID].Roles
+		// Client roles live under the client that verified the token, which a
+		// reload does not change.
+		groups = claims.ResourceAccess[clientID].Roles
 	default:
 		// Unsupported group claim location
 		slog.Warn("Unsupported OIDCGroupClaim value", "claim", groupClaim)
 		groups = []string{}
 	}
 
-	// Map groups to roles
 	roles = mapGroupsToRoles(conf, groups)
 
 	return username, groups, roles
-}
-
-// FetchUserInfoFromProvider fetches user info from the OIDC provider using an access token
-func (a *API) FetchUserInfoFromProvider(accessToken string) (*OidcUserInfo, error) {
-	if a.oidc == nil {
-		return nil, errors.New("OIDC state not initialized")
-	}
-
-	ctx := context.Background()
-
-	// Call the UserInfo endpoint
-	userInfo, err := a.oidc.oidcProvider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: accessToken,
-	}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user info: %w", err)
-	}
-
-	// Parse claims
-	var claims IDTokenClaims
-	if err := userInfo.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("failed to parse claims: %w", err)
-	}
-
-	// Extract user info using common function
-	conf := a.conf.Current()
-	username, groups, roles := extractUserInfoFromClaims(conf, &claims)
-
-	// Store in cache for future use with default expiration
-	expirySeconds := getRefreshTokenExpiry(conf, roles)
-	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
-	a.storeOIDCUserInfo(username, groups, roles, expiresAt, "")
-
-	return &OidcUserInfo{
-		Username:  username,
-		Groups:    groups,
-		Roles:     roles,
-		ExpiresAt: expiresAt,
-	}, nil
-}
-
-// ValidateOIDCToken validates an OIDC token (used for API authentication)
-func (a *API) ValidateOIDCToken(token string) (map[string]interface{}, error) {
-	if a.oidc == nil {
-		return nil, errors.New("OIDC state not initialized")
-	}
-
-	ctx := context.Background()
-
-	// Verify the token
-	idToken, err := a.oidc.oidcVerifier.Verify(ctx, token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %w", err)
-	}
-
-	// Extract claims using the same approach as callback
-	var claims IDTokenClaims
-	if err := idToken.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("failed to extract claims: %w", err)
-	}
-
-	// Get username with fallback priority
-	username := claims.PreferredUsername
-	if username == "" {
-		username = claims.Email
-	}
-	if username == "" {
-		username = claims.Name
-	}
-	if username == "" {
-		username = claims.Subject
-	}
-
-	if username == "" {
-		return nil, errors.New("no username found in token")
-	}
-
-	// Extract groups using same logic as callback
-	var groups []string
-	conf := a.conf.Current()
-	groupClaim := conf.OIDCSettings.OIDCGroupClaim
-	if groupClaim == "" {
-		groupClaim = "groups"
-	}
-
-	switch groupClaim {
-	case "groups":
-		groups = claims.Groups
-	case "roles":
-		groups = claims.Roles
-	case "realm_access.roles":
-		groups = claims.RealmAccess.Roles
-	default:
-		// Unsupported group claim location
-		slog.Warn("Unsupported OIDCGroupClaim value in ValidateOIDCToken", "claim", groupClaim)
-		groups = []string{}
-	}
-
-	roles := mapGroupsToRoles(conf, groups)
-	if len(roles) == 0 {
-		return nil, errors.New("user has no authorized roles")
-	}
-
-	return map[string]interface{}{
-		"username":   username,
-		"groups":     groups,
-		"roles":      roles,
-		"authSource": "oidc",
-	}, nil
 }
 
 // PKCE helpers
