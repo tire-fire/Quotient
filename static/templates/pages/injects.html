@@ -276,11 +276,8 @@
                                 </ul>
                             </div>
                             <script>
-                                // when the modal is opened, call this function to populate the existing files
                                 document.getElementById('edit__form').addEventListener('show.bs.modal', function (event) {
                                     const pane = event.relatedTarget.closest(".tab-pane");
-                                    // get pane's id number
-
                                     const id = pane.id.split("--")[1];
                                     const inject = injectsByID.get(id);
                                     const existingFilesList = document.getElementById("existing-files-list");
@@ -342,7 +339,6 @@
                 const FILES = FORM.querySelector("#edit-inject-files");
                 const EXISTING_FILES_LIST = FORM.querySelector("#existing-files-list");
 
-                // get id from event
                 const ID = FORM.getAttribute("data-inject-id");
 
                 if (new Date(OPENTIME.value) > new Date(DUETIME.value)) {
@@ -669,7 +665,6 @@
     const PDF_DOWNLOAD = document.getElementById("inject-pdf-download")
 
     let prevDataJson;
-    // The rendered injects by ID; the edit modal fills its form from these.
     const injectsByID = new Map();
 
     function injectFileURL(injectID, fileName) {
@@ -811,9 +806,9 @@
                 descTemp.innerHTML += `
                 <h5>Inject Details <span id="pane__countdown--${inject.ID}" class="inject-countdown-detail"></span></h5>
                 <ul>
-                    <li><p><strong>Release Time:</strong> <span id="pane__open--${inject.ID}">${inject.OpenTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
-                    <li><p><strong>Due Time:</strong> <span id="pane__due--${inject.ID}">${inject.DueTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
-                    <li><p><strong>Close Time:</strong> <span id="pane__close--${inject.ID}">${inject.CloseTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
+                    <li><p><strong>Release Time:</strong> ${inject.OpenTime.toLocaleString(undefined, { timeZoneName: 'short' })}</p></li>
+                    <li><p><strong>Due Time:</strong> ${inject.DueTime.toLocaleString(undefined, { timeZoneName: 'short' })}</p></li>
+                    <li><p><strong>Close Time:</strong> ${inject.CloseTime.toLocaleString(undefined, { timeZoneName: 'short' })}</p></li>
                     </ul>
                     `
                     description.appendChild(descTemp)
