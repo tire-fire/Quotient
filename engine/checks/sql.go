@@ -6,11 +6,30 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net"
 	"regexp"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
+
+// sqlNet is the go-sql-driver network registered to dial with clientLinux's
+// profile; the driver's own dialer sets none of it.
+const sqlNet = "quotient-linux"
+
+// sqlDial opens the SQL check's connections with the Linux profile.
+func sqlDial(ctx context.Context, addr string) (net.Conn, error) {
+	return clientLinux.dialer(0).DialContext(ctx, "tcp", addr)
+}
+
+func init() {
+	mysql.RegisterDialContext(sqlNet, sqlDial)
+}
+
+// sqlDSN is the go-sql-driver (mysql) data source name for a check.
+func sqlDSN(username, password, target string, port int, database string) string {
+	return fmt.Sprintf("%s:%s@%s(%s)/%s", username, password, sqlNet, net.JoinHostPort(target, fmt.Sprint(port)), database)
+}
 
 type Sql struct {
 	Service
@@ -43,7 +62,7 @@ func (c Sql) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		}
 
 		// Open the DB handle
-		db, err := sql.Open(c.Kind, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, c.Target, c.Port, q.Database))
+		db, err := sql.Open(c.Kind, sqlDSN(username, password, c.Target, c.Port, q.Database))
 		if err != nil {
 			checkResult.Error = "creating db handle failed"
 			checkResult.Debug = "error: " + err.Error() + ", creds " + username + ":" + password

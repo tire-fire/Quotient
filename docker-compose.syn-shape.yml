@@ -1,0 +1,31 @@
+# SYN shaping (Divisor SYN_SHAPE=on, runners QUOTIENT_PROFILE_MARK=dscp). Use with the main file:
+#   docker compose -f docker-compose.yml -f docker-compose.syn-shape.yml up -d
+# Needs a divisor submodule with SYN shaping and the watchdog subcommand.
+services:
+  runner:
+    sysctls:
+      # The runner's own network namespace: an 8 MiB maximum lets Windows-claiming sockets announce
+      # window scale 8 (Divisor only ever lowers a scale). Sockets without a profile announce 8 too.
+      net.ipv4.tcp_rmem: "4096 131072 8388608"
+
+  divisor:
+    volumes:
+      - divisor_state:/run/divisor # watchdog state, read for Divisor's per-rotation counters
+
+  # Lets SYNs leave unshaped while Divisor is frozen (see divisor's README). Its own container, so a
+  # frozen Divisor doesn't stop it.
+  divisor-watchdog:
+    build:
+      context: divisor/
+      dockerfile: Dockerfile
+    command: ["watchdog"]
+    restart: always
+    env_file:
+      - .env
+    network_mode: host # Divisor's network namespace, where the shaping table lives
+    cap_add: [NET_ADMIN]
+    volumes:
+      - divisor_state:/run/divisor
+
+volumes:
+  divisor_state:

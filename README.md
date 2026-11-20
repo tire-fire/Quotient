@@ -48,6 +48,8 @@ REDIS_HOST=quotient-redis
 
 Optional variables:
 - `LDAP_BIND_PASSWORD` - LDAP bind password (alternative to config file)
+- `QUOTIENT_RUNNER_EXTRA_HOPS` - added to the IP TTL of check sockets that claim an OS (currently the SQL check), for routers between the runner and where a real host would sit (default 0). With `QUOTIENT_PROFILE_MARK=dscp`, a shaping Divisor sets the TTL of marked sockets to its `TARGET_SUBNETS` itself (its `SHAPE_EXTRA_HOPS`).
+- `QUOTIENT_PROFILE_MARK=dscp` - marks those sockets with the DSCP value of the OS they claim (7 Windows, 11 Linux, 15 macOS) for a Divisor with `SYN_SHAPE=on`, which shapes the SYN to that OS and clears the mark. **Set it only behind such a Divisor**, or the marks reach the teams. Deploy shaping with the override file, `docker compose -f docker-compose.yml -f docker-compose.syn-shape.yml up -d`: it adds the `divisor-watchdog` service and gives runners an 8 MiB `net.ipv4.tcp_rmem` maximum so Windows-claiming sockets can announce window scale 8 (sockets without a profile then announce 8 as well). It needs a divisor with SYN shaping (the submodule bump).
 
 ## Troubleshooting
 
@@ -643,6 +645,8 @@ kind = "mysql"             # Database type
     output = "8.0"         # Expected output (optional)
     useregex = false
 ```
+
+Its connections claim Linux: Linux's IP TTL (64, plus `QUOTIENT_RUNNER_EXTRA_HOPS`; with `QUOTIENT_PROFILE_MARK=dscp` behind a shaping Divisor, 64 plus its `SHAPE_EXTRA_HOPS`), a 4 MiB window clamp (window scale 7) and, with `QUOTIENT_PROFILE_MARK=dscp`, the Linux DSCP mark.
 
 **Default port:** 3306
 **Default kind:** mysql
