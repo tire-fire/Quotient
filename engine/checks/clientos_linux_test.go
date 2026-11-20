@@ -87,10 +87,13 @@ func TestClientOSSYNOnTheWire(t *testing.T) {
 		conn, err := tc.os.dialer(time.Second).Dial("tcp4", ln.Addr().String())
 		require.NoError(t, err)
 		sport := uint16(conn.LocalAddr().(*net.TCPAddr).Port)
-		ttl, scale := captureSYN(t, fd, sport, port)
+		ttl, scale, win := captureSYN(t, fd, sport, port)
 		_ = conn.Close()
 		assert.Equal(t, tc.os.ttl(), ttl, "%s: TTL in the SYN", tc.os)
 		assert.Equal(t, min(tc.scale, host), scale, "%s: window scale in the SYN (host allows up to %d)", tc.os, host)
+		if tc.os == clientMacOS && rcvBufFits {
+			assert.Equal(t, 65535, win, "macOS SYN window")
+		}
 	}
 }
 
@@ -108,7 +111,7 @@ func hostWindowScale(t *testing.T) int {
 	return min(max(bits.Len(uint(space))-1-15, 0), 14)
 }
 
-func captureSYN(t *testing.T, fd int, sport, dport uint16) (ttl, scale int) {
+func captureSYN(t *testing.T, fd int, sport, dport uint16) (ttl, scale, win int) {
 	t.Helper()
 	buf := make([]byte, 65536)
 	deadline := time.Now().Add(3 * time.Second)
@@ -140,10 +143,10 @@ func captureSYN(t *testing.T, fd int, sport, dport uint16) (ttl, scale int) {
 				i += int(opts[i+1])
 			}
 		}
-		return int(ip[8]), scale
+		return int(ip[8]), scale, int(binary.BigEndian.Uint16(tcp[14:]))
 	}
 	t.Fatalf("no SYN from port %d captured", sport)
-	return 0, 0
+	return 0, 0, 0
 }
 
 func htons(v uint16) uint16 { return v<<8 | v>>8 }
@@ -167,5 +170,25 @@ func TestClientOSProfileMark(t *testing.T) {
 			assert.Equal(t, want, sockoptInt(t, conn, syscall.IPPROTO_IP, syscall.IP_TOS), "%s, mark %v", o, on)
 			_ = conn.Close()
 		}
+	}
+}
+
+// macOS sockets lock a 2 MiB receive buffer (the kernel reports it doubled)
+// when rmem_max allows; the others keep the kernel's autotuned buffer.
+func TestClientOSMacOSReceiveBuffer(t *testing.T) {
+	if !rcvBufFits {
+		t.Skip("net.core.rmem_max below 2 MiB: macOS sockets keep the default buffer")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	def, err := net.Dial("tcp", ln.Addr().String())
+	require.NoError(t, err)
+	defer def.Close()
+	for o, want := range map[clientOS]int{clientMacOS: 2 * macOSRcvBuf, clientWindows: sockoptInt(t, def, syscall.SOL_SOCKET, syscall.SO_RCVBUF), clientLinux: sockoptInt(t, def, syscall.SOL_SOCKET, syscall.SO_RCVBUF)} {
+		conn, err := o.dialer(time.Second).Dial("tcp", ln.Addr().String())
+		require.NoError(t, err)
+		assert.Equal(t, want, sockoptInt(t, conn, syscall.SOL_SOCKET, syscall.SO_RCVBUF), o.String())
+		_ = conn.Close()
 	}
 }

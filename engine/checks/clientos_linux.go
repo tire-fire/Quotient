@@ -28,6 +28,9 @@ func (o clientOS) control(network, _ string, c syscall.RawConn) error {
 		}
 		if serr == nil && strings.HasPrefix(network, "tcp") {
 			serr = syscall.SetsockoptInt(s, syscall.IPPROTO_TCP, syscall.TCP_WINDOW_CLAMP, o.windowClamp())
+			if serr == nil && o.rcvBuf() > 0 {
+				serr = syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_RCVBUF, o.rcvBuf())
+			}
 		}
 	})
 	if err != nil {
