@@ -206,11 +206,9 @@ func (se *ScoringEngine) Start() {
 	slog.Info("Restarting scoring...")
 }
 
-// divisorRotationTime is the least gap between a round returning and the next round's start, so the
-// next round's checks don't run while Divisor rotates the runners' source addresses on round_finish.
-// Divisor reads NUM_IPS from the .env it shares with the engine. It removes the old addresses, then
-// pings a candidate for each new one with a 1 s timeout, and rewrites the SNAT rules last, so the
-// rotation takes at least NUM_IPS seconds. Without a positive NUM_IPS there is no rotation to wait for.
+// divisorRotationTime is the least gap between a round returning and the next round's start. On
+// round_finish Divisor (same .env) removes the old source addresses, then spends a 1 s ping timeout
+// on each of NUM_IPS new ones before rewriting SNAT, so rotation takes at least NUM_IPS seconds.
 func divisorRotationTime(numIPs string) time.Duration {
 	n, err := strconv.Atoi(numIPs)
 	if err != nil || n <= 0 {
