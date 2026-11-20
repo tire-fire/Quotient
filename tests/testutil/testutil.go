@@ -84,6 +84,24 @@ func (p *PostgresContainer) Exec(t *testing.T, sql string, args ...any) {
 	require.NoError(t, conn.Exec(sql, args...).Error)
 }
 
+// Begin opens a transaction on a connection of its own, so a test can hold
+// locks while the code under test runs. It is rolled back at test cleanup
+// unless the test ends it first.
+func (p *PostgresContainer) Begin(t *testing.T) *gorm.DB {
+	t.Helper()
+	conn, err := gorm.Open(postgres.Open(p.connString), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := conn.DB()
+	require.NoError(t, err)
+	tx := conn.Begin()
+	require.NoError(t, tx.Error)
+	t.Cleanup(func() {
+		tx.Rollback()
+		_ = sqlDB.Close()
+	})
+	return tx
+}
+
 // Reconnect opens a fresh connection, re-running the migrations.
 func (p *PostgresContainer) Reconnect(t *testing.T) *db.DB {
 	t.Helper()

@@ -3,7 +3,6 @@ package db
 import (
 	"cmp"
 	"errors"
-	"math"
 	"slices"
 
 	"gorm.io/gorm"
@@ -73,11 +72,6 @@ func (d *DB) GetServiceCheckSumByRound() ([]map[uint]int, error) {
 			return nil, err
 		}
 
-		// Validate id fits in int and is valid for array indexing
-		if id == 0 || id > math.MaxInt {
-			continue // Skip invalid round IDs
-		}
-
 		if points[team] == nil {
 			points[team] = make(map[uint]int)
 		}
@@ -91,7 +85,7 @@ func (d *DB) GetServiceCheckSumByRound() ([]map[uint]int, error) {
 		return []map[uint]int{}, nil
 	}
 
-	penaltyRows, err := d.db.Table("sla_schemas").Select("round_id, team_id, sum(penalty) as penalty").Where("round_id BETWEEN 1 AND ?", lastRound).Group("round_id, team_id").Rows()
+	penaltyRows, err := d.db.Table("sla_schemas").Select("round_id, team_id, sum(penalty) as penalty").Where("round_id <= ?", lastRound).Group("round_id, team_id").Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +106,6 @@ func (d *DB) GetServiceCheckSumByRound() ([]map[uint]int, error) {
 			penalties[team] = make(map[uint]int)
 		}
 		penalties[team][id] = penalty
-		if points[team] == nil {
-			points[team] = make(map[uint]int)
-		}
 	}
 	if err := penaltyRows.Err(); err != nil {
 		return nil, err
@@ -128,14 +119,12 @@ func (d *DB) GetServiceCheckSumByRound() ([]map[uint]int, error) {
 		total, penalty, seen := 0, 0, false
 		for round := uint(1); round <= lastRound; round++ {
 			c, scored := cumulative[round]
-			p, penalized := penalties[team][round]
+			penalty += penalties[team][round]
+			seen = seen || scored
 			if scored {
 				total = c
 			}
-			penalty += p
-			seen = seen || scored || penalized
 			if seen {
-				// id starts at 1 so 0 index needs -1
 				result[round-1][team] = total - penalty
 			}
 		}
