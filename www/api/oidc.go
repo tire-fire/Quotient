@@ -58,7 +58,7 @@ type IDTokenClaims struct {
 		Roles []string `json:"roles"`
 	} `json:"realm_access"`
 
-	// Some providers nest groups under a resource
+	// Keycloak client roles, keyed by client ID
 	ResourceAccess map[string]struct {
 		Roles []string `json:"roles"`
 	} `json:"resource_access"`
@@ -643,112 +643,7 @@ func (a *API) extractUserInfoFromClaims(claims *IDTokenClaims) (username string,
 		username = claims.Subject
 	}
 
-	// Extract groups based on configured claim. One snapshot serves both settings, so a reload
-	// cannot pair the claim location from one config with the client id from another.
-	oidcCfg := a.conf.Current().OIDCSettings
-	groupClaim := oidcCfg.OIDCGroupClaim
-	if groupClaim == "" {
-		groupClaim = "groups"
-	}
-
-	switch groupClaim {
-	case "groups":
-		groups = claims.Groups
-	case "roles":
-		groups = claims.Roles
-	case "realm_access.roles":
-		groups = claims.RealmAccess.Roles
-	case "resource_access.roles":
-		// Client roles live under the client this deployment logs in as.
-		groups = claims.ResourceAccess[oidcCfg.OIDCClientID].Roles
-	default:
-		// Unsupported group claim location
-		slog.Warn("Unsupported OIDCGroupClaim value", "claim", groupClaim)
-		groups = []string{}
-	}
-
-	// Map groups to roles
-	roles = a.mapGroupsToRoles(groups)
-
-	return username, groups, roles
-}
-
-// FetchUserInfoFromProvider fetches user info from the OIDC provider using an access token
-func (a *API) FetchUserInfoFromProvider(accessToken string) (*OidcUserInfo, error) {
-	if a.oidc == nil {
-		return nil, errors.New("OIDC state not initialized")
-	}
-
-	ctx := context.Background()
-
-	// Call the UserInfo endpoint
-	userInfo, err := a.oidc.oidcProvider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: accessToken,
-	}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user info: %w", err)
-	}
-
-	// Parse claims
-	var claims IDTokenClaims
-	if err := userInfo.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("failed to parse claims: %w", err)
-	}
-
-	// Extract user info using common function
-	username, groups, roles := a.extractUserInfoFromClaims(&claims)
-
-	// Store in cache for future use with default expiration
-	expirySeconds := a.getRefreshTokenExpiry(roles)
-	expiresAt := time.Now().Add(time.Duration(expirySeconds) * time.Second)
-	a.storeOIDCUserInfo(username, groups, roles, expiresAt, "")
-
-	return &OidcUserInfo{
-		Username:  username,
-		Groups:    groups,
-		Roles:     roles,
-		ExpiresAt: expiresAt,
-	}, nil
-}
-
-// ValidateOIDCToken validates an OIDC token (used for API authentication)
-func (a *API) ValidateOIDCToken(token string) (map[string]interface{}, error) {
-	if a.oidc == nil {
-		return nil, errors.New("OIDC state not initialized")
-	}
-
-	ctx := context.Background()
-
-	// Verify the token
-	idToken, err := a.oidc.oidcVerifier.Verify(ctx, token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %w", err)
-	}
-
-	// Extract claims using the same approach as callback
-	var claims IDTokenClaims
-	if err := idToken.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("failed to extract claims: %w", err)
-	}
-
-	// Get username with fallback priority
-	username := claims.PreferredUsername
-	if username == "" {
-		username = claims.Email
-	}
-	if username == "" {
-		username = claims.Name
-	}
-	if username == "" {
-		username = claims.Subject
-	}
-
-	if username == "" {
-		return nil, errors.New("no username found in token")
-	}
-
-	// Extract groups using same logic as callback
-	var groups []string
+	// Extract groups based on configured claim
 	groupClaim := a.conf.Current().OIDCSettings.OIDCGroupClaim
 	if groupClaim == "" {
 		groupClaim = "groups"
@@ -761,23 +656,20 @@ func (a *API) ValidateOIDCToken(token string) (map[string]interface{}, error) {
 		groups = claims.Roles
 	case "realm_access.roles":
 		groups = claims.RealmAccess.Roles
+	case "resource_access.roles":
+		// Client roles live under the client this deployment logs in as. That is the client
+		// the token was issued to and verified against, fixed at InitOIDC; a reloaded
+		// OIDCClientID does not change it.
+		groups = claims.ResourceAccess[a.oidc.oauth2Config.ClientID].Roles
 	default:
-		// Unsupported group claim location
-		slog.Warn("Unsupported OIDCGroupClaim value in ValidateOIDCToken", "claim", groupClaim)
+		slog.Warn("Unsupported OIDCGroupClaim value", "claim", groupClaim)
 		groups = []string{}
 	}
 
-	roles := a.mapGroupsToRoles(groups)
-	if len(roles) == 0 {
-		return nil, errors.New("user has no authorized roles")
-	}
+	// Map groups to roles
+	roles = a.mapGroupsToRoles(groups)
 
-	return map[string]interface{}{
-		"username":   username,
-		"groups":     groups,
-		"roles":      roles,
-		"authSource": "oidc",
-	}, nil
+	return username, groups, roles
 }
 
 // PKCE helpers
