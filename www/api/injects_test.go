@@ -65,9 +65,6 @@ func putInject(t *testing.T, a *API, id uint, fields map[string]string) *httptes
 	return rec
 }
 
-// TestUpdateInjectOpenTime verifies that editing an unreleased inject cannot
-// move its release time into the past (which would release it to every team at
-// once), while already-open injects stay editable and "release now" works.
 func TestUpdateInjectOpenTime(t *testing.T) {
 	a, pg := newInjectTestAPI(t)
 	team := pg.CreateTestTeam(t, "inject-team", "01")
@@ -95,7 +92,6 @@ func TestUpdateInjectOpenTime(t *testing.T) {
 		inject := create("unreleased", open)
 		require.NotContains(t, visibleInjectIDs(t, a, team), inject.ID)
 
-		// A year-less release time re-parsed by the browser lands in 2001.
 		past := time.Date(2001, open.Month(), open.Day(), open.Hour(), open.Minute(), 0, 0, time.UTC)
 		rec := putInject(t, a, inject.ID, fields("unreleased", past))
 		assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
@@ -115,4 +111,37 @@ func TestUpdateInjectOpenTime(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 		assert.Contains(t, visibleInjectIDs(t, a, team), inject.ID)
 	})
+}
+
+// The edit form omits times the admin left unchanged; an omitted time must
+// keep its seconds, or an imported inject drifts off its competition offset.
+func TestUpdateImportedInjectKeepsOmittedTimes(t *testing.T) {
+	a, _ := newInjectTestAPI(t)
+
+	start := time.Now().UTC().Truncate(time.Minute).Add(-time.Hour + 37*time.Second)
+	openOffset, dueOffset, closeOffset := int64(0), int64(3600), int64(7200)
+	inject, err := a.eng.DB.CreateInject(db.InjectSchema{
+		Title: "imported", Description: "scenario",
+		OpenTime: start, DueTime: start.Add(time.Hour), CloseTime: start.Add(2 * time.Hour),
+		OpenOffset: &openOffset, DueOffset: &dueOffset, CloseOffset: &closeOffset,
+	})
+	require.NoError(t, err)
+	started, err := a.eng.DB.StartCompetitionOnce(start)
+	require.NoError(t, err)
+	require.True(t, started)
+
+	rec := putInject(t, a, inject.ID, map[string]string{"title": "imported (edited)", "description": "scenario"})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	edited, err := a.eng.DB.GetInjectByID(inject.ID)
+	require.NoError(t, err)
+	assert.True(t, start.Equal(edited.OpenTime), "open time %s, want %s", edited.OpenTime, start)
+	assert.Equal(t, []int64{0, 3600, 7200}, []int64{*edited.OpenOffset, *edited.DueOffset, *edited.CloseOffset})
+
+	due := start.Add(90 * time.Minute).Truncate(time.Minute)
+	rec = putInject(t, a, inject.ID, map[string]string{"title": "imported (edited)", "description": "scenario", "due-time": due.Format(time.RFC3339)})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	edited, err = a.eng.DB.GetInjectByID(inject.ID)
+	require.NoError(t, err)
+	assert.True(t, start.Equal(edited.OpenTime), "open time %s, want %s", edited.OpenTime, start)
+	assert.Equal(t, []int64{0, 90*60 - 37, 7200}, []int64{*edited.OpenOffset, *edited.DueOffset, *edited.CloseOffset})
 }

@@ -282,37 +282,32 @@
                                     // get pane's id number
 
                                     const id = pane.id.split("--")[1];
-                                    const title = document.getElementById(`tab__title--${id}`);
-                                    const description = document.getElementById(`pane__description--${id}`);
-                                    const opentime = document.getElementById(`pane__open--${id}`);
-                                    const duetime = document.getElementById(`pane__due--${id}`);
-                                    const closetime = document.getElementById(`pane__close--${id}`);
-                                    const existingFiles = pane.querySelectorAll("a[href^='/injects/']");
+                                    const inject = injectsByID.get(id);
                                     const existingFilesList = document.getElementById("existing-files-list");
 
-                                    document.getElementById("edit-inject-title").value = title.textContent;
-                                    document.getElementById("edit-inject-description").value = description.firstElementChild.firstElementChild.textContent;
-                                    // Pre-fill from the ISO instants in data-time; the
-                                    // localized display text has no year.
-                                    const formatDateTimeLocal = (isoString) => {
-                                        const date = new Date(isoString);
+                                    document.getElementById("edit-inject-title").value = inject.Title;
+                                    document.getElementById("edit-inject-description").value = inject.Description;
+                                    // The inputs hold minutes only. defaultValue keeps the
+                                    // pre-filled value so formEdit sends only changed times.
+                                    const fillTime = (inputID, date) => {
+                                        const input = document.getElementById(inputID);
                                         const tzOffset = date.getTimezoneOffset() * 60000;
-                                        const localISOTime = (new Date(date - tzOffset)).toISOString().slice(0, 16);
-                                        return localISOTime;
+                                        input.value = (new Date(date - tzOffset)).toISOString().slice(0, 16);
+                                        input.defaultValue = input.value;
                                     };
 
-                                    document.getElementById("edit-inject-opentime").value = formatDateTimeLocal(opentime.dataset.time);
-                                    document.getElementById("edit-inject-duetime").value = formatDateTimeLocal(duetime.dataset.time);
-                                    document.getElementById("edit-inject-closetime").value = formatDateTimeLocal(closetime.dataset.time);
+                                    fillTime("edit-inject-opentime", inject.OpenTime);
+                                    fillTime("edit-inject-duetime", inject.DueTime);
+                                    fillTime("edit-inject-closetime", inject.CloseTime);
 
                                     existingFilesList.innerHTML = "";
 
-                                    existingFiles.forEach((fileLink) => {
+                                    (inject.InjectFileNames || []).forEach((file) => {
                                         const li = document.createElement("li");
                                         li.className = "list-group-item d-flex justify-content-between align-items-center";
                                         const a = document.createElement("a");
-                                        a.href = fileLink.href;
-                                        a.textContent = fileLink.textContent;
+                                        a.href = injectFileURL(inject.ID, file);
+                                        a.textContent = file;
                                         a.target = "_blank";
                                         li.appendChild(a);
                                         const checkbox = document.createElement("input");
@@ -362,9 +357,12 @@
                 const PAYLOAD = new FormData();
                 PAYLOAD.append("title", TITLE.value);
                 PAYLOAD.append("description", DESCRIPTION.value);
-                PAYLOAD.append("open-time", new Date(OPENTIME.value).toISOString());
-                PAYLOAD.append("due-time", new Date(DUETIME.value).toISOString());
-                PAYLOAD.append("close-time", new Date(CLOSETIME.value).toISOString());
+                // Resending an unchanged minute-precision time would drop its seconds.
+                for (const [field, input] of [["open-time", OPENTIME], ["due-time", DUETIME], ["close-time", CLOSETIME]]) {
+                    if (input.value !== input.defaultValue) {
+                        PAYLOAD.append(field, new Date(input.value).toISOString());
+                    }
+                }
                 for (const file of FILES.files) {
                     PAYLOAD.append("files", file);
                 }
@@ -384,7 +382,7 @@
                     return response.json();
                 }).then((data) => {
                     if (data.error) {
-                        console.error(data.error);
+                        alert(data.error);
                         return;
                     } else {
                         console.log(data);
@@ -671,6 +669,8 @@
     const PDF_DOWNLOAD = document.getElementById("inject-pdf-download")
 
     let prevDataJson;
+    // The rendered injects by ID; the edit modal fills its form from these.
+    const injectsByID = new Map();
 
     function injectFileURL(injectID, fileName) {
         return `/injects/${encodeURIComponent(injectID)}/${encodeURIComponent(fileName)}`
@@ -718,6 +718,7 @@
                 return;
             }
             prevDataJson = dataJson;
+            injectsByID.clear();
             if (items.length === 0) {
                 return
             }
@@ -727,6 +728,7 @@
                 inject.OpenTime = (new Date(inject.OpenTime))
                 inject.DueTime = (new Date(inject.DueTime))
                 inject.CloseTime = (new Date(inject.CloseTime))
+                injectsByID.set(String(inject.ID), inject)
                 let tab = PLACEHOLDER_TAB.cloneNode(true)
                 let pane = PLACEHOLDER_PANE.cloneNode(true)
                 tab.classList.remove("placeholder-glow", "d-none")
@@ -809,9 +811,9 @@
                 descTemp.innerHTML += `
                 <h5>Inject Details <span id="pane__countdown--${inject.ID}" class="inject-countdown-detail"></span></h5>
                 <ul>
-                    <li><p><strong>Release Time:</strong> <span id="pane__open--${inject.ID}" data-time="${inject.OpenTime.toISOString()}">${inject.OpenTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
-                    <li><p><strong>Due Time:</strong> <span id="pane__due--${inject.ID}" data-time="${inject.DueTime.toISOString()}">${inject.DueTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
-                    <li><p><strong>Close Time:</strong> <span id="pane__close--${inject.ID}" data-time="${inject.CloseTime.toISOString()}">${inject.CloseTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
+                    <li><p><strong>Release Time:</strong> <span id="pane__open--${inject.ID}">${inject.OpenTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
+                    <li><p><strong>Due Time:</strong> <span id="pane__due--${inject.ID}">${inject.DueTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
+                    <li><p><strong>Close Time:</strong> <span id="pane__close--${inject.ID}">${inject.CloseTime.toLocaleString(undefined, { timeZoneName: 'short' })}</span></p></li>
                     </ul>
                     `
                     description.appendChild(descTemp)
