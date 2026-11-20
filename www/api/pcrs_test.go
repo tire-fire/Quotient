@@ -62,8 +62,11 @@ func TestAllowPCRForTeamEasyPCRDisabled(t *testing.T) {
 	assert.JSONEq(t, `{"error":"PCR reset not allowed"}`, w.Body.String())
 }
 
-func TestPCRAndResetRequireJSONContentType(t *testing.T) {
-	// No engine: ResetScores would panic on it if it got past the check.
+// Each state-changing POST below refuses CORS-simple content types, so a
+// cross-site page cannot send it without a preflight (CSRF).
+func TestJSONHandlersRequireJSONContentType(t *testing.T) {
+	// No engine and an empty body: a handler past the check returns 400 for the
+	// body or panics on the engine (ResetScores), never 415.
 	a := withEasyPCR(t, true)
 	onTeam1 := Identity{Username: "team01", Roles: []string{"team"}, TeamID: 1, HasTeam: true}
 	handlers := []struct {
@@ -72,7 +75,12 @@ func TestPCRAndResetRequireJSONContentType(t *testing.T) {
 	}{
 		{"CreatePcr", a.CreatePcr},
 		{"ResetPcr", a.ResetPcr},
+		{"PauseEngine", a.PauseEngine},
 		{"ResetScores", a.ResetScores},
+		{"SetCompetitionStarted", a.SetCompetitionStarted},
+		{"SetCompetitionSchedule", a.SetCompetitionSchedule},
+		{"UpdateTeams", a.UpdateTeams},
+		{"UpdateTeamChecks", a.UpdateTeamChecks},
 	}
 
 	for _, handler := range handlers {
