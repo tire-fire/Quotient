@@ -1,9 +1,5 @@
 package checks
 
-// Each test serves a hostile reply from a fake server in the parent test
-// process and runs the real check in a child process that must survive and
-// report the service down.
-
 import (
 	"bufio"
 	"fmt"
@@ -44,8 +40,7 @@ func hostileServe(t *testing.T, handle func(net.Conn)) int {
 }
 
 // hostileChild serves handle in the parent, runs check against it in a child
-// process and asserts the child survives with a failed result. In the child
-// it runs the check and prints the result.
+// process and asserts the child survives with a failed result.
 func hostileChild(t *testing.T, handle func(net.Conn), check func(port int) Runner) {
 	t.Helper()
 	if os.Getenv(hostileChildEnv) == t.Name() {
