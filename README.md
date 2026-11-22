@@ -382,8 +382,8 @@ All checks support these common properties:
 | `port` | Service port | Type-specific |
 | `points` | Points awarded for success | Global default |
 | `timeout` | Check timeout in seconds | Global default |
-| `slathreshold` | Consecutive failures before this check's SLA penalty; overrides the global value | Global default |
-| `slapenalty` | Points deducted on this check's SLA violation; overrides the global value, and `0` counts SLAs without deducting | Global default |
+| `slathreshold` | Consecutive failures before this check incurs an SLA. Omit or set to `0` to inherit the global threshold. | `MiscSettings.SlaThreshold` |
+| `slapenalty` | Points deducted per SLA for this check. Omit to inherit the global penalty; set to `0` to record SLAs without deducting points. | `MiscSettings.SlaPenalty` |
 | `attempts` | Tries before the check fails | Global default |
 | `attemptdelay` | Seconds to wait before retrying a failed attempt | Global default |
 | `credlists` | Array of credlist names for authentication | None |
