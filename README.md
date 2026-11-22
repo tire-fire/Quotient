@@ -462,7 +462,9 @@ scheme = "https"  # "http" or "https"
 **Default port:** 80 (http) or 443 (https)
 **Default scheme:** http
 
-**Redirects:** the check follows redirects (up to 10) that stay on the same hostname as the target, for example `/` to `/login` or `http` to `https`. A redirect to a different hostname is not followed; the check judges that 3xx response against the URL's `status` and `regex`. Set `disableredirects = true` on the box to judge every redirect as the 3xx response, for example to check for `status = 301`.
+**Redirects:** by default, the check does not follow redirects. It evaluates the original 3xx response against the URL's `status` and `regex`. To follow redirects for one check, set `followredirects = true` under its `[[box.web]]` entry. Opted-in checks still stop at a different hostname and retain the 10-redirect limit.
+
+**Upgrade note:** checks that expect the final response after a same-host redirect (such as `/` to `/login` or HTTP to HTTPS) need `followredirects = true` or a URL that points directly to the final endpoint. To check the redirect itself, leave following off and set the expected 3xx status.
 
 #### SSH Check
 

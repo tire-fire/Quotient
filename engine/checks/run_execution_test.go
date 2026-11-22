@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -159,8 +160,6 @@ func TestWebRun_ActualExecution(t *testing.T) {
 	}
 }
 
-// TestWebRun_Redirects verifies that the web check follows redirects only while
-// they stay on the target host, and none when DisableRedirects is set.
 func TestWebRun_Redirects(t *testing.T) {
 	healthy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -187,23 +186,28 @@ func TestWebRun_Redirects(t *testing.T) {
 	tests := []struct {
 		name      string
 		path      string
-		disable   bool
+		follow    bool
+		status    int
 		wantPass  bool
 		wantError string
 		wantDebug string
 	}{
-		{name: "same host redirect is followed", path: "/same-host", wantPass: true},
-		{name: "other host redirect is refused", path: "/other-host", wantError: "status returned by webserver was incorrect", wantDebug: "(redirect to http://localhost:"},
-		{name: "same host redirect refused when disabled", path: "/same-host", disable: true, wantError: "status returned by webserver was incorrect"},
-		{name: "redirect loop fails", path: "/loop", wantError: "web request errored out"},
+		{name: "same host redirect refused by default", path: "/same-host", status: 200, wantError: "status returned by webserver was incorrect"},
+		{name: "default checks the redirect response", path: "/same-host", status: 302, wantPass: true},
+		{name: "opt-in follows same host redirect", path: "/same-host", follow: true, status: 200, wantPass: true},
+		{name: "opt-in still refuses other host", path: "/other-host", follow: true, status: 200, wantError: "status returned by webserver was incorrect", wantDebug: "(redirect to http://localhost:"},
+		{name: "opt-in bounds redirect loops", path: "/loop", follow: true, status: 200, wantError: "web request errored out"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			check := &Web{
-				Service:          Service{Target: "127.0.0.1", Port: port, Timeout: 5},
-				Scheme:           "http",
-				Url:              []urlData{{Path: tt.path, Status: 200}},
-				DisableRedirects: tt.disable,
+				Service: Service{Target: "127.0.0.1", Port: port, Timeout: 5},
+				Scheme:  "http",
+				Url:     []urlData{{Path: tt.path, Status: tt.status}},
+			}
+			if tt.follow {
+				_, err := toml.Decode("followredirects = true", check)
+				require.NoError(t, err)
 			}
 
 			resultsChan := make(chan Result, 1)

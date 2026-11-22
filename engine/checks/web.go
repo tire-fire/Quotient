@@ -19,11 +19,9 @@ import (
 
 type Web struct {
 	Service
-	Url    []urlData
-	Scheme string
-	// DisableRedirects judges any 3xx as the response instead of following
-	// redirects to the same hostname.
-	DisableRedirects bool `toml:",omitempty"`
+	Url             []urlData
+	Scheme          string
+	FollowRedirects bool `toml:",omitempty"`
 }
 
 const maxRedirects = 10
@@ -31,10 +29,9 @@ const maxRedirects = 10
 // redirectPolicy follows redirects only while they stay on the first request's
 // hostname (any port or scheme); a redirect to another hostname is returned as
 // the response, and the check judges it against the URL's Status and Regex.
-// disable refuses every redirect.
-func redirectPolicy(disable bool) func(*http.Request, []*http.Request) error {
+func redirectPolicy(follow bool) func(*http.Request, []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
-		if disable || !strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
+		if !follow || !strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
 			return http.ErrUseLastResponse
 		}
 		if len(via) >= maxRedirects {
@@ -85,7 +82,7 @@ func (c Web) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 		client := &http.Client{
 			Transport:     tr,
 			Timeout:       clientTimeout,
-			CheckRedirect: redirectPolicy(c.DisableRedirects),
+			CheckRedirect: redirectPolicy(c.FollowRedirects),
 		}
 
 		requestURL := fmt.Sprintf("%s://%s:%d%s", c.Scheme, c.Target, c.Port, u.Path)
