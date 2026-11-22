@@ -334,7 +334,7 @@ name = "inject01"
 pw = "password"
 ```
 
-A local session is tied to the account's password: changing a user's `pw` in `event.conf` ends every session that user opened with the old password, and they must log in again. Setting the old password back brings those sessions back. To end every session at once for good, including LDAP and OIDC ones, delete `config/COOKIEKEY` and restart Quotient; a new key is generated on startup.
+A local session is a login authenticated by a `name` and `pw` entry in the TOML `event.conf` above. Changing that user's `pw` invalidates their existing local cookies; restoring the old password can make them valid again until they expire. LDAP and OIDC sessions are unaffected by local password changes. To invalidate all existing cookies, including LDAP and OIDC ones, delete `config/COOKIEKEY` and restart Quotient.
 
 #### Environment Configuration
 
