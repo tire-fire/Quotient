@@ -96,9 +96,11 @@ func (c Sql) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			return
 		}
 
-		var re *regexp.Regexp
+		matches := func(value []byte) bool { return strings.TrimSpace(string(value)) == q.Output }
+		matchType := "exact string"
 		if q.UseRegex {
-			re = regexp.MustCompile(q.Output)
+			matches = regexp.MustCompile(q.Output).Match
+			matchType = "regex"
 		}
 
 		// Check the rows
@@ -129,16 +131,9 @@ func (c Sql) Run(teamID uint, teamIdentifier string, roundID uint, resultsChan c
 			}
 
 			// TODO: by default we check against the first column
-			if re != nil {
-				if re.Match(row[0]) {
-					checkResult.Status = true
-					checkResult.Debug = "found regex match: " + string(row[0]) + ". creds used were " + username + ":" + password
-					response <- checkResult
-					return
-				}
-			} else if strings.TrimSpace(string(row[0])) == q.Output {
+			if matches(row[0]) {
 				checkResult.Status = true
-				checkResult.Debug = "found exact string match: " + string(row[0]) + ". creds used were " + username + ":" + password
+				checkResult.Debug = "found " + matchType + " match: " + string(row[0]) + ". creds used were " + username + ":" + password
 				response <- checkResult
 				return
 			}

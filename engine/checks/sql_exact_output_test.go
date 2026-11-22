@@ -52,8 +52,24 @@ func TestSqlExactOutputWithRegexMetacharacters(t *testing.T) {
 	}
 	require.NoError(t, c.Verify("box01", "192.0.2.1", 10, 5, 0, 0))
 
-	results := make(chan Result, 1)
-	c.Run(1, "01", 1, results)
-	r := <-results
-	assert.True(t, r.Status, "error=%q debug=%q", r.Error, r.Debug)
+	for _, tc := range []struct {
+		name   string
+		regex  bool
+		output string
+		want   bool
+	}{
+		{"literal metacharacters", false, "count(*)", true},
+		{"pattern is not a literal match", false, `^count`, false},
+		{"regex matches prefix", true, `^count`, true},
+		{"regex misses", true, `^sum`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c.Query[0].UseRegex = tc.regex
+			c.Query[0].Output = tc.output
+			results := make(chan Result, 1)
+			c.Run(1, "01", 1, results)
+			r := <-results
+			assert.Equal(t, tc.want, r.Status, "error=%q debug=%q", r.Error, r.Debug)
+		})
+	}
 }
