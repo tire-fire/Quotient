@@ -31,9 +31,10 @@ func TestWebCheckSendsBrowserHeaders(t *testing.T) {
 	require.NoError(t, err)
 
 	c := &Web{
-		Service: Service{Target: "127.0.0.1", Port: port, Timeout: 5},
-		Scheme:  "http",
-		Url:     []urlData{{Path: "/start", Status: 200}},
+		Service:         Service{Target: "127.0.0.1", Port: port, Timeout: 5},
+		Scheme:          "http",
+		Url:             []urlData{{Path: "/start", Status: 200}},
+		FollowRedirects: true,
 	}
 	resultsChan := make(chan Result, 1)
 	c.Run(1, "01", 1, resultsChan)
